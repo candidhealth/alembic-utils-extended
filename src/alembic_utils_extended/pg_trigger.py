@@ -1,7 +1,9 @@
 # pylint: disable=unused-argument,invalid-name,line-too-long
+from typing import Generator
 
 from parse import parse
 from sqlalchemy import text as sql_text
+from sqlalchemy.sql.elements import TextClause
 
 from alembic_utils_extended.exceptions import SQLParseFailure
 from alembic_utils_extended.on_entity_mixin import OnEntityMixin
@@ -97,7 +99,7 @@ class PGTrigger(OnEntityMixin, ReplaceableEntity):
                 )
         raise SQLParseFailure(f'Failed to parse SQL into PGTrigger """{sql}"""')
 
-    def to_sql_statement_create(self):
+    def to_sql_statement_create(self) -> Generator[TextClause, None, None]:
         """Generates a SQL "create trigger" statement for PGTrigger"""
 
         # We need to parse and replace the schema qualifier on the table for simulate_entity to
@@ -120,17 +122,17 @@ class PGTrigger(OnEntityMixin, ReplaceableEntity):
         # Re-render the definition ensuring the table is qualified with
         def_rendered = _template.replace("{:s}", " ").format(event=event, on_entity=on_entity, action=action)
 
-        return sql_text(f"CREATE{' CONSTRAINT ' if self.is_constraint else ' '}TRIGGER \"{self.signature}\" {def_rendered}")
+        yield sql_text(f"CREATE{' CONSTRAINT ' if self.is_constraint else ' '}TRIGGER \"{self.signature}\" {def_rendered}")
 
-    def to_sql_statement_drop(self, cascade=False):
+    def to_sql_statement_drop(self, cascade=False) -> Generator[TextClause, None, None]:
         """Generates a SQL "drop trigger" statement for PGTrigger"""
         cascade = "cascade" if cascade else ""
-        return sql_text(f'DROP TRIGGER "{self.signature}" ON {self.on_entity} {cascade}')
+        yield sql_text(f'DROP TRIGGER "{self.signature}" ON {self.on_entity} {cascade}')
 
-    def to_sql_statement_create_or_replace(self):
+    def to_sql_statement_create_or_replace(self) -> Generator[TextClause, None, None]:
         """Generates a SQL "replace trigger" statement for PGTrigger"""
         yield sql_text(f'DROP TRIGGER IF EXISTS "{self.signature}" ON {self.on_entity};')
-        yield self.to_sql_statement_create()
+        yield from self.to_sql_statement_create()
 
     @classmethod
     def from_database(cls, sess, schema):

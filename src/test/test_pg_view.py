@@ -58,10 +58,10 @@ def test_create_revision(engine) -> None:
     run_alembic_command(engine=engine, command="downgrade", command_kwargs={"revision": "base"})
 
 
-def test_update_revision(engine) -> None:
+def test_update_revision(engine, execute_all) -> None:
     # Create the view outside of a revision
     with engine.begin() as connection:
-        connection.execute(TEST_VIEW.to_sql_statement_create())
+        execute_all(connection, TEST_VIEW.to_sql_statement_create())
 
     # Update definition of TO_UPPER
     UPDATED_TEST_VIEW = PGView(TEST_VIEW.schema, TEST_VIEW.signature, """select *, TRUE as is_updated from pg_views;""")
@@ -96,10 +96,10 @@ def test_update_revision(engine) -> None:
     run_alembic_command(engine=engine, command="downgrade", command_kwargs={"revision": "base"})
 
 
-def test_noop_revision(engine) -> None:
+def test_noop_revision(engine, execute_all) -> None:
     # Create the view outside of a revision
     with engine.begin() as connection:
-        connection.execute(TEST_VIEW.to_sql_statement_create())
+        execute_all(connection, TEST_VIEW.to_sql_statement_create())
 
     register_entities([TEST_VIEW], entity_types=[PGView])
 
@@ -128,14 +128,14 @@ def test_noop_revision(engine) -> None:
     run_alembic_command(engine=engine, command="downgrade", command_kwargs={"revision": "base"})
 
 
-def test_drop_revision(engine) -> None:
+def test_drop_revision(engine, execute_all) -> None:
 
     # Register no functions locally
     register_entities([], schemas=["DEV"], entity_types=[PGView])
 
     # Manually create a SQL function
     with engine.begin() as connection:
-        connection.execute(TEST_VIEW.to_sql_statement_create())
+        execute_all(connection, TEST_VIEW.to_sql_statement_create())
 
     output = run_alembic_command(
         engine=engine,
@@ -159,10 +159,10 @@ def test_drop_revision(engine) -> None:
     run_alembic_command(engine=engine, command="downgrade", command_kwargs={"revision": "base"})
 
 
-def test_update_create_or_replace_failover_to_drop_add(engine) -> None:
+def test_update_create_or_replace_failover_to_drop_add(engine, execute_all) -> None:
     # Create the view outside of a revision
     with engine.begin() as connection:
-        connection.execute(TEST_VIEW.to_sql_statement_create())
+        execute_all(connection, TEST_VIEW.to_sql_statement_create())
 
     # Update definition of TO_UPPER
     # deleted columns from the beginning of the view.
