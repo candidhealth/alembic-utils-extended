@@ -1,4 +1,5 @@
 import pytest
+from sqlalchemy import Index
 
 from alembic_utils_extended.exceptions import SQLParseFailure
 from alembic_utils_extended.pg_materialized_view import PGMaterializedView
@@ -8,11 +9,14 @@ from alembic_utils_extended.testbase import (
     run_alembic_command,
 )
 
+INDEXES = [Index("ix", "c1", unique=True)]
+
 TEST_MAT_VIEW = PGMaterializedView(
     schema="DEV",
     signature="test_mat_view",
-    definition="SELECT concat('https://something/', cast(x as text)) FROM generate_series(1,10) x",
+    definition="SELECT concat('https://something/', cast(x as text)) as c1 FROM generate_series(1,10) x",
     with_data=True,
+    indexes=INDEXES,
 )
 
 
@@ -69,6 +73,7 @@ def test_create_revision(engine) -> None:
     assert "op.drop_entity" in migration_contents
     assert "op.replace_entity" not in migration_contents
     assert "from alembic_utils_extended.pg_materialized_view import PGMaterializedView" in migration_contents
+    assert "op.create_index" in migration_contents
 
     # ensure colon was not quoted
     # https://github.com/candidhealth/alembic-utils-extended/issues/95
@@ -89,8 +94,9 @@ def test_update_revision(engine, execute_all) -> None:
     UPDATED_TEST_MAT_VIEW = PGMaterializedView(
         TEST_MAT_VIEW.schema,
         TEST_MAT_VIEW.signature,
-        """select *, TRUE as is_updated from pg_matviews""",
+        """select '1' as c1, *, TRUE as is_updated from pg_matviews""",
         with_data=TEST_MAT_VIEW.with_data,
+        indexes=TEST_MAT_VIEW.indexes
     )
 
     register_entities([UPDATED_TEST_MAT_VIEW], entity_types=[PGMaterializedView])
@@ -112,6 +118,7 @@ def test_update_revision(engine, execute_all) -> None:
     assert "op.create_entity" not in migration_contents
     assert "op.drop_entity" not in migration_contents
     assert "from alembic_utils_extended.pg_materialized_view import PGMaterializedView" in migration_contents
+    assert "op.create_index" in migration_contents
 
     # Execute upgrade
     run_alembic_command(engine=engine, command="upgrade", command_kwargs={"revision": "head"})
@@ -152,7 +159,6 @@ def test_noop_revision(engine, execute_all) -> None:
 
 
 def test_drop_revision(engine, execute_all) -> None:
-
     # Register no functions locally
     register_entities([], schemas=["DEV"], entity_types=[PGMaterializedView])
 
