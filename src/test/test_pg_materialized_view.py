@@ -68,10 +68,7 @@ def test_create_revision(engine) -> None:
     assert "op.create_entity" in migration_contents
     assert "op.drop_entity" in migration_contents
     assert "op.replace_entity" not in migration_contents
-    assert (
-        "from alembic_utils_extended.pg_materialized_view import PGMaterializedView"
-        in migration_contents
-    )
+    assert "from alembic_utils_extended.pg_materialized_view import PGMaterializedView" in migration_contents
 
     # ensure colon was not quoted
     # https://github.com/candidhealth/alembic-utils-extended/issues/95
@@ -114,10 +111,7 @@ def test_update_revision(engine) -> None:
     assert "op.replace_entity" in migration_contents
     assert "op.create_entity" not in migration_contents
     assert "op.drop_entity" not in migration_contents
-    assert (
-        "from alembic_utils_extended.pg_materialized_view import PGMaterializedView"
-        in migration_contents
-    )
+    assert "from alembic_utils_extended.pg_materialized_view import PGMaterializedView" in migration_contents
 
     # Execute upgrade
     run_alembic_command(engine=engine, command="upgrade", command_kwargs={"revision": "head"})

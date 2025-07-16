@@ -95,24 +95,18 @@ class ReplaceableEntity:
         """Generates a SQL "create or replace function" statement for PGFunction"""
         raise NotImplementedError()
 
-    def get_database_definition(
-        self: T, sess: Session, dependencies: Optional[List["ReplaceableEntity"]] = None
-    ) -> T:  # $Optional[T]:
+    def get_database_definition(self: T, sess: Session, dependencies: Optional[List["ReplaceableEntity"]] = None) -> T:  # $Optional[T]:
         """Creates the entity in the database, retrieves its 'rendered' then rolls it back"""
         with simulate_entity(sess, self, dependencies) as sess:
             # Drop self
             sess.execute(self.to_sql_statement_drop())
 
             # collect all remaining entities
-            db_entities: List[T] = sorted(
-                self.from_database(sess, schema=self.schema), key=lambda x: x.identity
-            )
+            db_entities: List[T] = sorted(self.from_database(sess, schema=self.schema), key=lambda x: x.identity)
 
         with simulate_entity(sess, self, dependencies) as sess:
             # collect all remaining entities
-            all_w_self: List[T] = sorted(
-                self.from_database(sess, schema=self.schema), key=lambda x: x.identity
-            )
+            all_w_self: List[T] = sorted(self.from_database(sess, schema=self.schema), key=lambda x: x.identity)
 
         # Find "self" by diffing the before and after
         for without_self, with_self in zip_longest(db_entities, all_w_self):
@@ -266,9 +260,7 @@ def compare_registered_entities(
     # pulled from the inspector
     include_schemas: bool = autogen_context.opts["include_schemas"]
 
-    reflected_schemas = set(
-        autogen_context.inspector.get_schema_names() if include_schemas else []  # type: ignore
-    )
+    reflected_schemas = set(autogen_context.inspector.get_schema_names() if include_schemas else [])  # type: ignore
     sqla_schemas: Set[Optional[str]] = set(schemas)
     manual_schemas = set(registry.schemas or set())  # Deprecated for remove in 0.6.0
     entity_schemas = {x.schema for x in entities}  # from ReplaceableEntity instances
@@ -279,11 +271,7 @@ def compare_registered_entities(
         schema_name
         for schema_name in all_schema_references
         if (
-            schema_name
-            is not None
-            not in (
-                registry.exclude_schemas or set()
-            )  # user defined. Deprecated for remove in 0.6.0
+            schema_name is not None not in (registry.exclude_schemas or set())  # user defined. Deprecated for remove in 0.6.0
             and schema_name not in {"information_schema", None}
         )
     }
@@ -327,9 +315,7 @@ def compare_registered_entities(
         try:
             maybe_op = entity.get_required_migration_op(sess, dependencies=has_create_or_update_op)
 
-            local_db_def = entity.get_database_definition(
-                sess, dependencies=has_create_or_update_op
-            )
+            local_db_def = entity.get_database_definition(sess, dependencies=has_create_or_update_op)
             local_entities.append(local_db_def)
 
             if maybe_op:
@@ -369,9 +355,7 @@ def compare_registered_entities(
             # Entities within the schemas that are live
             for schema in observed_schemas:
 
-                db_entities: List[ReplaceableEntity] = entity_class.from_database(
-                    sess, schema=schema
-                )
+                db_entities: List[ReplaceableEntity] = entity_class.from_database(sess, schema=schema)
 
                 # Check for functions that were deleted locally
                 for db_entity in db_entities:
@@ -402,9 +386,7 @@ def compare_registered_entities(
         sess.rollback()
 
 
-def include_entity(
-    entity: ReplaceableEntity, autogen_context: AutogenContext, reflected: bool
-) -> bool:
+def include_entity(entity: ReplaceableEntity, autogen_context: AutogenContext, reflected: bool) -> bool:
     """The functions on the AutogenContext object
     are described here:
     https://alembic.sqlalchemy.org/en/latest/api/autogenerate.html#alembic.autogenerate.api.AutogenContext.run_name_filters
@@ -432,7 +414,5 @@ def include_entity(
         name_result = True
 
     # Object filters should be applied to object from local metadata and to reflected objects
-    object_result = autogen_context.run_object_filters(
-        entity, name, entity.type_, reflected=reflected, compare_to=None
-    )
+    object_result = autogen_context.run_object_filters(entity, name, entity.type_, reflected=reflected, compare_to=None)
     return name_result and object_result

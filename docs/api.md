@@ -1,7 +1,7 @@
 ## API Reference
 
-::: alembic_utils.replaceable_entity.register_entities
-    :docstring:
+::: alembic_utils_extended.replaceable_entity.register_entities
+:docstring:
 
 ```python
 # migrations/env.py
@@ -13,8 +13,8 @@ from app.views import my_view
 register_entities(entities=[my_function, my_view], exclude_schema=['audit'])
 ```
 
-::: alembic_utils.pg_function.PGFunction
-    :docstring:
+::: alembic_utils_extended.pg_function.PGFunction
+:docstring:
 
 ```python
 from alembic_utils_extended.pg_function import PGFunction
@@ -26,9 +26,8 @@ to_lower = PGFunction(
 )
 ```
 
-
-::: alembic_utils.pg_view.PGView
-    :docstring:
+::: alembic_utils_extended.pg_view.PGView
+:docstring:
 
 ```python
 from alembic_utils_extended.pg_view import PGView
@@ -40,8 +39,8 @@ scifi_books = PGView(
 )
 ```
 
-::: alembic_utils.pg_materialized_view.PGMaterializedView
-    :docstring:
+::: alembic_utils_extended.pg_materialized_view.PGMaterializedView
+:docstring:
 
 ```python
 from alembic_utils_extended.pg_materialized_view import PGMaterializedView
@@ -54,9 +53,8 @@ scifi_books = PGMaterializedView(
 )
 ```
 
-
-::: alembic_utils.pg_trigger.PGTrigger
-    :docstring:
+::: alembic_utils_extended.pg_trigger.PGTrigger
+:docstring:
 
 ```python
 from alembic_utils_extended.pg_trigger import PGTrigger
@@ -72,8 +70,8 @@ trigger = PGTrigger(
 )
 ```
 
-::: alembic_utils.pg_extension.PGExtension
-    :docstring:
+::: alembic_utils_extended.pg_extension.PGExtension
+:docstring:
 
 ```python
 from alembic_utils_extended.pg_extension import PGExtension
@@ -84,9 +82,8 @@ extension = PGExtension(
 )
 ```
 
-
-::: alembic_utils.pg_policy.PGPolicy
-    :docstring:
+::: alembic_utils_extended.pg_policy.PGPolicy
+:docstring:
 
 ```python
 from alembic_utils_extended.pg_policy import PGPolicy
@@ -104,9 +101,8 @@ policy = PGPolicy(
 )
 ```
 
-
-::: alembic_utils.pg_grant_table.PGGrantTable
-    :docstring:
+::: alembic_utils_extended.pg_grant_table.PGGrantTable
+:docstring:
 
 ```python
 from alembic_utils_extended.pg_grant_table import PGGrantTable

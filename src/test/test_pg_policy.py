@@ -65,10 +65,7 @@ def test_parse_without_schema_on_entity() -> None:
     assert policy.schema == "public"
     assert policy.signature == "mypol"
     assert policy.on_entity == "public.accOunt"
-    assert (
-        policy.definition
-        == "as PERMISSIVE for SELECT to account_creator using (true) wiTh CHECK (true)"
-    )
+    assert policy.definition == "as PERMISSIVE for SELECT to account_creator using (true) wiTh CHECK (true)"
 
 
 def test_create_revision(engine, schema_setup) -> None:

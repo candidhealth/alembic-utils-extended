@@ -45,9 +45,7 @@ class PGTrigger(OnEntityMixin, ReplaceableEntity):
         on_entity: str,
         is_constraint: bool = False,
     ):
-        super().__init__(
-            schema=schema, signature=signature, definition=definition, on_entity=on_entity  # type: ignore
-        )
+        super().__init__(schema=schema, signature=signature, definition=definition, on_entity=on_entity)  # type: ignore
         self.is_constraint = is_constraint
 
     def render_self_for_migration(self, omit_definition=False) -> str:
@@ -88,9 +86,7 @@ class PGTrigger(OnEntityMixin, ReplaceableEntity):
                 schema = on_entity.split(".")[0]
 
                 definition_template = " {event} ON {on_entity} {action}"
-                definition = definition_template.format(
-                    event=event, on_entity=on_entity, action=action
-                )
+                definition = definition_template.format(event=event, on_entity=on_entity, action=action)
 
                 return cls(
                     schema=schema,
@@ -122,13 +118,9 @@ class PGTrigger(OnEntityMixin, ReplaceableEntity):
         on_entity = f"{self.schema}.{on_entity}"
 
         # Re-render the definition ensuring the table is qualified with
-        def_rendered = _template.replace("{:s}", " ").format(
-            event=event, on_entity=on_entity, action=action
-        )
+        def_rendered = _template.replace("{:s}", " ").format(event=event, on_entity=on_entity, action=action)
 
-        return sql_text(
-            f"CREATE{' CONSTRAINT ' if self.is_constraint else ' '}TRIGGER \"{self.signature}\" {def_rendered}"
-        )
+        return sql_text(f"CREATE{' CONSTRAINT ' if self.is_constraint else ' '}TRIGGER \"{self.signature}\" {def_rendered}")
 
     def to_sql_statement_drop(self, cascade=False):
         """Generates a SQL "drop trigger" statement for PGTrigger"""

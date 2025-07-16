@@ -86,18 +86,14 @@ class PGMaterializedView(ReplaceableEntity):
     def to_sql_statement_drop(self, cascade=False) -> TextClause:
         """Generates a SQL "drop view" statement"""
         cascade = "cascade" if cascade else ""
-        return sql_text(
-            f'DROP MATERIALIZED VIEW {self.literal_schema}."{self.signature}" {cascade}'
-        )
+        return sql_text(f'DROP MATERIALIZED VIEW {self.literal_schema}."{self.signature}" {cascade}')
 
     def to_sql_statement_create_or_replace(self) -> Generator[TextClause, None, None]:
         """Generates a SQL "create or replace view" statement"""
         # Remove possible semicolon from definition because we're adding a "WITH DATA" clause
         definition = self.definition.rstrip().rstrip(";")
 
-        yield sql_text(
-            f"""DROP MATERIALIZED VIEW IF EXISTS {self.literal_schema}."{self.signature}"; """
-        )
+        yield sql_text(f"""DROP MATERIALIZED VIEW IF EXISTS {self.literal_schema}."{self.signature}"; """)
         yield sql_text(
             f"""CREATE MATERIALIZED VIEW {self.literal_schema}."{self.signature}" AS {definition} WITH {"NO" if not self.with_data else ""} DATA"""
         )

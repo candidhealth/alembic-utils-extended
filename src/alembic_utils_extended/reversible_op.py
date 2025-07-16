@@ -32,9 +32,7 @@ class ReversibleOp(MigrateOperation):
         return operations.invoke(op)
 
     @classmethod
-    def invoke_for_target_optional_cascade(
-        cls: Type[SupportsTargetCascade], operations, target: "ReplaceableEntity", cascade=False
-    ):
+    def invoke_for_target_optional_cascade(cls: Type[SupportsTargetCascade], operations, target: "ReplaceableEntity", cascade=False):
         op = cls(target, cascade=cascade)  # pylint: disable=unexpected-keyword-arg
         return operations.invoke(op)
 
@@ -136,10 +134,7 @@ def render_drop_entity(autogen_context, op):
     target = op.target
     autogen_context.imports.add(target.render_import_statement())
     variable_name = target.to_variable_name()
-    return (
-        target.render_self_for_migration(omit_definition=False)
-        + f"op.drop_entity({variable_name})\n"
-    )
+    return target.render_self_for_migration(omit_definition=False) + f"op.drop_entity({variable_name})\n"
 
 
 @renderers.dispatch_for(ReplaceOp)

@@ -72,9 +72,7 @@ def test_drop_fails_with_cascade(engine, sess) -> None:
     assert "op.drop_entity" in migration_contents
     assert "op.drop_entity(public_a_view)" in migration_contents
 
-    migration_contents = migration_contents.replace(
-        "op.drop_entity(public_a_view)", "op.drop_entity(public_a_view, cascade=True)"
-    )
+    migration_contents = migration_contents.replace("op.drop_entity(public_a_view)", "op.drop_entity(public_a_view, cascade=True)")
 
     with migration_create_path.open("w") as migration_file:
         migration_file.write(migration_contents)

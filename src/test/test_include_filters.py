@@ -40,9 +40,7 @@ FuncDef = """
         $$ begin return upper(some_text) || 'abc'; end; $$ language PLPGSQL;
         """
 
-IncludedFunc = PGFunction(
-    schema="public", signature="toUpper(some_text text default 'my text!')", definition=FuncDef
-)
+IncludedFunc = PGFunction(schema="public", signature="toUpper(some_text text default 'my text!')", definition=FuncDef)
 
 ObjExcludedFunc = PGFunction(
     schema="public",

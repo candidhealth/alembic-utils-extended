@@ -52,9 +52,7 @@ class PGView(ReplaceableEntity):
 
     def to_sql_statement_create(self) -> TextClause:
         """Generates a SQL "create view" statement"""
-        return sql_text(
-            f'CREATE VIEW {self.literal_schema}."{self.signature}" AS {self.definition};'
-        )
+        return sql_text(f'CREATE VIEW {self.literal_schema}."{self.signature}" AS {self.definition};')
 
     def to_sql_statement_drop(self, cascade=False) -> TextClause:
         """Generates a SQL "drop view" statement"""

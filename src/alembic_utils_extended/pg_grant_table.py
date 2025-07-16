@@ -93,14 +93,10 @@ class PGGrantTable(ReplaceableEntity):
 
         if PGGrantTableChoice(self.grant) in {C.SELECT, C.INSERT, C.UPDATE, C.REFERENCES}:
             if len(self.columns) == 0:
-                raise BadInputException(
-                    f"When grant type is {self.grant} a value must be provided for columns"
-                )
+                raise BadInputException(f"When grant type is {self.grant} a value must be provided for columns")
         else:
             if self.columns:
-                raise BadInputException(
-                    f"When grant type is {self.grant} a value must not be provided for columns"
-                )
+                raise BadInputException(f"When grant type is {self.grant} a value must not be provided for columns")
 
     @classmethod
     def from_sql(cls, sql: str) -> "PGGrantTable":
@@ -160,12 +156,7 @@ class PGGrantTable(ReplaceableEntity):
         rows = sess.execute(sql, params={"schema": schema}).fetchall()
         grants = []
 
-        grouped = (
-            flu(rows)
-            .group_by(lambda x: SchemaTableRole(*x[:5]))
-            .map(lambda x: (x[0], x[1].map_item(5).collect()))
-            .collect()
-        )
+        grouped = flu(rows).group_by(lambda x: SchemaTableRole(*x[:5])).map(lambda x: (x[0], x[1].map_item(5).collect())).collect()
         for s_t_r, columns in grouped:
             grant = cls(
                 schema=s_t_r.schema,
@@ -223,9 +214,7 @@ class PGGrantTable(ReplaceableEntity):
     def to_sql_statement_drop(self, cascade=False) -> TextClause:
         """Generates a SQL "drop view" statement"""
         # cascade has no impact
-        return sql_text(
-            f"REVOKE {self.grant} ON {self.literal_schema}.{coerce_to_quoted(self.table)} FROM {coerce_to_quoted(self.role)}"
-        )
+        return sql_text(f"REVOKE {self.grant} ON {self.literal_schema}.{coerce_to_quoted(self.table)} FROM {coerce_to_quoted(self.role)}")
 
     def to_sql_statement_create_or_replace(self) -> Generator[TextClause, None, None]:
         yield self.to_sql_statement_drop()

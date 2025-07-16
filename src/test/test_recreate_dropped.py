@@ -4,9 +4,7 @@ from sqlalchemy.orm import Session
 from alembic_utils_extended.depends import recreate_dropped
 from alembic_utils_extended.pg_view import PGView
 
-TEST_ROOT_BIGINT = PGView(
-    schema="public", signature="root", definition="select 1::bigint as some_val"
-)
+TEST_ROOT_BIGINT = PGView(schema="public", signature="root", definition="select 1::bigint as some_val")
 
 TEST_ROOT_INT = PGView(schema="public", signature="root", definition="select 1::int as some_val")
 

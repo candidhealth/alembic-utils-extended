@@ -37,14 +37,7 @@ def maybe_start_pg() -> Generator[None, None, None]:
         return
 
     try:
-        is_running = (
-            subprocess.check_output(
-                ["docker", "inspect", "-f", "{{.State.Running}}", container_name]
-            )
-            .decode()
-            .strip()
-            == "true"
-        )
+        is_running = subprocess.check_output(["docker", "inspect", "-f", "{{.State.Running}}", container_name]).decode().strip() == "true"
     except subprocess.CalledProcessError:
         # Can't inspect container if it isn't running
         is_running = False

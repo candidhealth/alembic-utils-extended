@@ -40,9 +40,9 @@ def walk_modules(module: ModuleType) -> Generator[ModuleType, None, None]:
                 if "__init__.py" not in str(module_path):
 
                     # Example: elt.settings
-                    module_import_path = str(module_path)[
-                        len(str(top_path_absolute)) - len(top_module.__name__) :
-                    ].replace(os.path.sep, ".")[:-3]
+                    module_import_path = str(module_path)[len(str(top_path_absolute)) - len(top_module.__name__) :].replace(
+                        os.path.sep, "."
+                    )[:-3]
 
                     module = importlib.import_module(module_import_path)
                     yield module
