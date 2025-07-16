@@ -1,4 +1,4 @@
-site_name: alembic_utils
+site_name: alembic_utils_extended
 site_description: Autogenerate Support for PostgreSQL Functions and (soon) Views
 
 theme:
@@ -7,9 +7,9 @@ theme:
 extra_css:
     - css/custom.css
 
-repo_name: olirice/alembic_utils
-repo_url: https://github.com/olirice/alembic_utils
-site_url: https://olirice.github.io/alembic_utils
+repo_name: candidhealth/alembic-utils-extended
+repo_url: https://github.com/candidhealth/alembic-utils-extended
+site_url: https://candidhealth.github.io/alembic-utils-extended
 
 nav:
     - Introduction: 'index.md'

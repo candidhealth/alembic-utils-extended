@@ -1,8 +1,8 @@
 import pytest
 
-from alembic_utils.exceptions import SQLParseFailure
-from alembic_utils.pg_function import PGFunction
-from alembic_utils.testbase import TEST_RESOURCE_ROOT
+from alembic_utils_extended.exceptions import SQLParseFailure
+from alembic_utils_extended.pg_function import PGFunction
+from alembic_utils_extended.testbase import TEST_RESOURCE_ROOT
 
 
 def test_pg_function_from_file() -> None:

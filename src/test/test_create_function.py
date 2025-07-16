@@ -1,6 +1,6 @@
 from sqlalchemy import text
 
-from alembic_utils.pg_function import PGFunction
+from alembic_utils_extended.pg_function import PGFunction
 
 to_upper = PGFunction(
     schema="public",

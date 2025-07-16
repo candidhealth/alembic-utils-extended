@@ -3,7 +3,7 @@ from logging.config import fileConfig
 from alembic import context
 from sqlalchemy import MetaData, engine_from_config, pool
 
-from alembic_utils.replaceable_entity import ReplaceableEntity
+from alembic_utils_extended.replaceable_entity import ReplaceableEntity
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -26,7 +26,7 @@ target_metadata = MetaData()
 
 
 def include_object(object, name, type_, reflected, compare_to) -> bool:
-    # Do not generate migrations for non-alembic_utils entities
+    # Do not generate migrations for non-alembic_utils_extended entities
     if isinstance(object, ReplaceableEntity):
         # In order to test the application if this filter within
         # the autogeneration logic, apply a simple filter that

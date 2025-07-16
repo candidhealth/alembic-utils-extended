@@ -24,10 +24,10 @@ DEV_REQUIRES = [
 ]
 
 setup(
-    name="alembic_utils",
-    version=get_version("alembic_utils"),
-    author="Oliver Rice",
-    author_email="oliver@oliverrice.com",
+    name="alembic-utils-extended",
+    version=get_version("alembic-utils-extended"),
+    author="Justin Malin",
+    author_email="justin@joincandidhealth.com",
     license="MIT",
     description="A sqlalchemy/alembic extension for migrating procedures and views ",
     python_requires=">=3.7",

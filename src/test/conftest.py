@@ -13,8 +13,8 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
-from alembic_utils.replaceable_entity import registry
-from alembic_utils.testbase import TEST_VERSIONS_ROOT
+from alembic_utils_extended.replaceable_entity import registry
+from alembic_utils_extended.testbase import TEST_VERSIONS_ROOT
 
 PYTEST_DB = "postgresql://alem_user:password@localhost:5610/alem_db"
 
@@ -24,7 +24,7 @@ def maybe_start_pg() -> Generator[None, None, None]:
     """Creates a postgres 12 docker container that can be connected
     to using the PYTEST_DB connection string"""
 
-    container_name = "alembic_utils_pg"
+    container_name = "alembic_utils__extended_pg"
     image = "postgres:13"
 
     connection_template = "postgresql://{user}:{pw}@{host}:{port:d}/{db}"

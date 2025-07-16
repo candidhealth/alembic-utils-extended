@@ -1,4 +1,4 @@
-from alembic_utils.experimental._collect_instances import (
+from alembic_utils_extended.experimental._collect_instances import (
     collect_instances,
     collect_subclasses,
 )

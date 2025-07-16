@@ -1,10 +1,13 @@
 import pytest
 from sqlalchemy.exc import ProgrammingError
 
-from alembic_utils.exceptions import SQLParseFailure
-from alembic_utils.pg_view import PGView
-from alembic_utils.replaceable_entity import register_entities
-from alembic_utils.testbase import TEST_VERSIONS_ROOT, run_alembic_command
+from alembic_utils_extended.exceptions import SQLParseFailure
+from alembic_utils_extended.pg_view import PGView
+from alembic_utils_extended.replaceable_entity import register_entities
+from alembic_utils_extended.testbase import (
+    TEST_VERSIONS_ROOT,
+    run_alembic_command,
+)
 
 TEST_VIEW = PGView(
     schema="DEV", signature="testExample", definition="select *, FALSE as is_updated from pg_views"
@@ -49,7 +52,7 @@ def test_create_revision(engine) -> None:
     assert "op.create_entity" in migration_contents
     assert "op.drop_entity" in migration_contents
     assert "op.replace_entity" not in migration_contents
-    assert "from alembic_utils.pg_view import PGView" in migration_contents
+    assert "from alembic_utils_extended.pg_view import PGView" in migration_contents
 
     # Execute upgrade
     run_alembic_command(engine=engine, command="upgrade", command_kwargs={"revision": "head"})
@@ -85,7 +88,7 @@ def test_update_revision(engine) -> None:
     assert "op.replace_entity" in migration_contents
     assert "op.create_entity" not in migration_contents
     assert "op.drop_entity" not in migration_contents
-    assert "from alembic_utils.pg_view import PGView" in migration_contents
+    assert "from alembic_utils_extended.pg_view import PGView" in migration_contents
 
     assert "true" in migration_contents.lower()
     assert "false" in migration_contents.lower()
@@ -121,7 +124,7 @@ def test_noop_revision(engine) -> None:
     assert "op.create_entity" not in migration_contents
     assert "op.drop_entity" not in migration_contents
     assert "op.replace_entity" not in migration_contents
-    assert "from alembic_utils" not in migration_contents
+    assert "from alembic_utils_extended" not in migration_contents
 
     # Execute upgrade
     run_alembic_command(engine=engine, command="upgrade", command_kwargs={"revision": "head"})
@@ -153,7 +156,7 @@ def test_drop_revision(engine) -> None:
 
     assert "op.drop_entity" in migration_contents
     assert "op.create_entity" in migration_contents
-    assert "from alembic_utils" in migration_contents
+    assert "from alembic_utils_extended" in migration_contents
     assert migration_contents.index("op.drop_entity") < migration_contents.index("op.create_entity")
 
     # Execute upgrade
@@ -196,7 +199,7 @@ def test_update_create_or_replace_failover_to_drop_add(engine) -> None:
     assert "op.replace_entity" in migration_contents
     assert "op.create_entity" not in migration_contents
     assert "op.drop_entity" not in migration_contents
-    assert "from alembic_utils.pg_view import PGView" in migration_contents
+    assert "from alembic_utils_extended.pg_view import PGView" in migration_contents
 
     # Execute upgrade
     run_alembic_command(engine=engine, command="upgrade", command_kwargs={"revision": "head"})
@@ -219,7 +222,7 @@ def test_attempt_revision_on_unparsable(engine) -> None:
 
 def test_create_revision_with_url_w_colon(engine) -> None:
     """Ensure no regression where views escape colons
-    More info at: https://github.com/olirice/alembic_utils/issues/58
+    More info at: https://github.com/candidhealth/alembic-utils-extended/issues/58
     """
     url = "https://something/"
     query = f"SELECT concat('{url}', v::text) FROM generate_series(1,2) x(v)"
@@ -241,7 +244,7 @@ def test_create_revision_with_url_w_colon(engine) -> None:
     assert "op.create_entity" in migration_contents
     assert "op.drop_entity" in migration_contents
     assert "op.replace_entity" not in migration_contents
-    assert "from alembic_utils.pg_view import PGView" in migration_contents
+    assert "from alembic_utils_extended.pg_view import PGView" in migration_contents
 
     # Execute upgrade
     run_alembic_command(engine=engine, command="upgrade", command_kwargs={"revision": "head"})
@@ -275,7 +278,7 @@ def test_view_contains_colon(engine) -> None:
     assert "op.create_entity" in migration_contents
     assert "op.drop_entity" in migration_contents
     assert "op.replace_entity" not in migration_contents
-    assert "from alembic_utils.pg_view import PGView" in migration_contents
+    assert "from alembic_utils_extended.pg_view import PGView" in migration_contents
 
     # Execute upgrade
     run_alembic_command(engine=engine, command="upgrade", command_kwargs={"revision": "head"})

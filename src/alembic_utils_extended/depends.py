@@ -5,7 +5,7 @@ from typing import Generator, List
 from sqlalchemy import exc as sqla_exc
 from sqlalchemy.orm import Session
 
-from alembic_utils.simulate import simulate_entity
+from alembic_utils_extended.simulate import simulate_entity
 
 logger = logging.getLogger(__name__)
 
@@ -78,11 +78,11 @@ def recreate_dropped(connection) -> Generator[Session, None, None]:
                 existing_type=sa.Integer(),
             )
     """
-    from alembic_utils.pg_function import PGFunction
-    from alembic_utils.pg_materialized_view import PGMaterializedView
-    from alembic_utils.pg_trigger import PGTrigger
-    from alembic_utils.pg_view import PGView
-    from alembic_utils.replaceable_entity import ReplaceableEntity
+    from alembic_utils_extended.pg_function import PGFunction
+    from alembic_utils_extended.pg_materialized_view import PGMaterializedView
+    from alembic_utils_extended.pg_trigger import PGTrigger
+    from alembic_utils_extended.pg_view import PGView
+    from alembic_utils_extended.replaceable_entity import ReplaceableEntity
 
     # Do not include permissions here e.g. PGGrantTable. If columns granted to users are dropped, it will cause an error
 

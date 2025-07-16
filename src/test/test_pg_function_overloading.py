@@ -1,6 +1,9 @@
-from alembic_utils.pg_function import PGFunction
-from alembic_utils.replaceable_entity import register_entities
-from alembic_utils.testbase import TEST_VERSIONS_ROOT, run_alembic_command
+from alembic_utils_extended.pg_function import PGFunction
+from alembic_utils_extended.replaceable_entity import register_entities
+from alembic_utils_extended.testbase import (
+    TEST_VERSIONS_ROOT,
+    run_alembic_command,
+)
 
 TO_FLOAT_FROM_INT = PGFunction(
     schema="public",
@@ -40,7 +43,7 @@ def test_create_revision(engine) -> None:
     assert migration_contents.count("op.create_entity") == 2
     assert "op.drop_entity" in migration_contents
     assert "op.replace_entity" not in migration_contents
-    assert "from alembic_utils.pg_function import PGFunction" in migration_contents
+    assert "from alembic_utils_extended.pg_function import PGFunction" in migration_contents
 
     # Execute upgrade
     run_alembic_command(engine=engine, command="upgrade", command_kwargs={"revision": "head"})
@@ -82,7 +85,7 @@ def test_update_revision(engine) -> None:
     assert migration_contents.count("op.replace_entity") == 2
     assert "op.create_entity" not in migration_contents
     assert "op.drop_entity" not in migration_contents
-    assert "from alembic_utils.pg_function import PGFunction" in migration_contents
+    assert "from alembic_utils_extended.pg_function import PGFunction" in migration_contents
 
     # Execute upgrade
     run_alembic_command(engine=engine, command="upgrade", command_kwargs={"revision": "head"})

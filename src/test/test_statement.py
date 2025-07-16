@@ -1,4 +1,7 @@
-from alembic_utils.statement import coerce_to_quoted, coerce_to_unquoted
+from alembic_utils_extended.statement import (
+    coerce_to_quoted,
+    coerce_to_unquoted,
+)
 
 
 def test_coerce_to_quoted() -> None:

@@ -5,32 +5,33 @@
 
 First, install alembic_utils
 ```shell
-$ pip install alembic_utils
+$ pip install alembic_utils_extended
 ```
 
 Next, add "alembic_utils" to the logger keys in `alembic.ini` and a configuration for it.
 ```
 ...
 [loggers]
-keys=root,sqlalchemy,alembic,alembic_utils
+keys=root,sqlalchemy,alembic,alembic_utils_extended
 
-[logger_alembic_utils]
+[logger_alembic_utils_extended]
 level = INFO
 handlers =
-qualname = alembic_utils
+qualname = alembic_utils_extended
 ```
 
 ### Reference
 
 Then add a function to your project
+
 ```python
 # my_function.py
-from alembic_utils.pg_function import PGFunction
+from alembic_utils_extended.pg_function import PGFunction
 
 to_upper = PGFunction(
-  schema='public',
-  signature='to_upper(some_text text)',
-  definition="""
+    schema='public',
+    signature='to_upper(some_text text)',
+    definition="""
   RETURNS text as
   $$
     SELECT upper(some_text)
@@ -40,9 +41,10 @@ to_upper = PGFunction(
 ```
 
 and/or a view
+
 ```python
 # my_view.py
-from alembic_utils.pg_view import PGView
+from alembic_utils_extended.pg_view import PGView
 
 first_view = PGView(
     schema="public",
@@ -60,7 +62,7 @@ Finally, update your `<migrations_folder>/env.py` to register your entities with
 # <migrations_folder>/env.py
 
 # Add these lines
-from alembic_utils.replaceable_entity import register_entities
+from alembic_utils_extended.replaceable_entity import register_entities
 
 from my_function import to_upper
 from my_view import first_view

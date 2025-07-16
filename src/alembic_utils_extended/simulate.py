@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, List, Optional
 from sqlalchemy.orm import Session
 
 if TYPE_CHECKING:
-    from alembic_utils.replaceable_entity import ReplaceableEntity
+    from alembic_utils_extended.replaceable_entity import ReplaceableEntity
 
 
 logger = logging.getLogger(__name__)
@@ -24,7 +24,7 @@ def simulate_entity(
     """
 
     # When simulating materialized view, don't populate them with data
-    from alembic_utils.pg_materialized_view import PGMaterializedView
+    from alembic_utils_extended.pg_materialized_view import PGMaterializedView
 
     if isinstance(entity, PGMaterializedView) and entity.with_data:
         entity = copy.deepcopy(entity)

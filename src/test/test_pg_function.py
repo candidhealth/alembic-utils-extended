@@ -2,9 +2,12 @@ from typing import List
 
 from sqlalchemy import text
 
-from alembic_utils.pg_function import PGFunction
-from alembic_utils.replaceable_entity import register_entities
-from alembic_utils.testbase import TEST_VERSIONS_ROOT, run_alembic_command
+from alembic_utils_extended.pg_function import PGFunction
+from alembic_utils_extended.replaceable_entity import register_entities
+from alembic_utils_extended.testbase import (
+    TEST_VERSIONS_ROOT,
+    run_alembic_command,
+)
 
 TO_UPPER = PGFunction(
     schema="public",
@@ -47,7 +50,7 @@ def test_create_revision(engine) -> None:
     assert "op.create_entity" in migration_contents
     assert "op.drop_entity" in migration_contents
     assert "op.replace_entity" not in migration_contents
-    assert "from alembic_utils.pg_function import PGFunction" in migration_contents
+    assert "from alembic_utils_extended.pg_function import PGFunction" in migration_contents
 
     # Execute upgrade
     run_alembic_command(engine=engine, command="upgrade", command_kwargs={"revision": "head"})
@@ -87,7 +90,7 @@ def test_update_revision(engine) -> None:
     assert "op.replace_entity" in migration_contents
     assert "op.create_entity" not in migration_contents
     assert "op.drop_entity" not in migration_contents
-    assert "from alembic_utils.pg_function import PGFunction" in migration_contents
+    assert "from alembic_utils_extended.pg_function import PGFunction" in migration_contents
 
     # Execute upgrade
     run_alembic_command(engine=engine, command="upgrade", command_kwargs={"revision": "head"})
@@ -115,7 +118,7 @@ def test_noop_revision(engine) -> None:
     assert "op.create_entity" not in migration_contents
     assert "op.drop_entity" not in migration_contents
     assert "op.replace_entity" not in migration_contents
-    assert "from alembic_utils" not in migration_contents
+    assert "from alembic_utils_extended" not in migration_contents
 
     # Execute upgrade
     run_alembic_command(engine=engine, command="upgrade", command_kwargs={"revision": "head"})
@@ -144,7 +147,7 @@ def test_drop(engine) -> None:
 
     assert "op.drop_entity" in migration_contents
     assert "op.create_entity" in migration_contents
-    assert "from alembic_utils" in migration_contents
+    assert "from alembic_utils_extended" in migration_contents
     assert migration_contents.index("op.drop_entity") < migration_contents.index("op.create_entity")
 
     # Execute upgrade
@@ -252,7 +255,7 @@ def test_plpgsql_colon_esacpe(engine) -> None:
     assert "op.create_entity" in migration_contents
     assert "op.drop_entity" in migration_contents
     assert "op.replace_entity" not in migration_contents
-    assert "from alembic_utils.pg_function import PGFunction" in migration_contents
+    assert "from alembic_utils_extended.pg_function import PGFunction" in migration_contents
 
     # Execute upgrade
     run_alembic_command(engine=engine, command="upgrade", command_kwargs={"revision": "head"})

@@ -1,9 +1,12 @@
 import pytest
 
-from alembic_utils.depends import solve_resolution_order
-from alembic_utils.pg_view import PGView
-from alembic_utils.replaceable_entity import register_entities
-from alembic_utils.testbase import TEST_VERSIONS_ROOT, run_alembic_command
+from alembic_utils_extended.depends import solve_resolution_order
+from alembic_utils_extended.pg_view import PGView
+from alembic_utils_extended.replaceable_entity import register_entities
+from alembic_utils_extended.testbase import (
+    TEST_VERSIONS_ROOT,
+    run_alembic_command,
+)
 
 # NAME_DEPENDENCIES
 
@@ -74,7 +77,7 @@ def test_create_revision(engine) -> None:
     assert migration_contents.count("op.create_entity") == 5
     assert migration_contents.count("op.drop_entity") == 5
     assert "op.replace_entity" not in migration_contents
-    assert "from alembic_utils.pg_view import PGView" in migration_contents
+    assert "from alembic_utils_extended.pg_view import PGView" in migration_contents
 
     # Execute upgrade
     run_alembic_command(engine=engine, command="upgrade", command_kwargs={"revision": "head"})

@@ -1,6 +1,7 @@
 ## Example Outputs
 
 ### Migration for newly created function
+
 ```python
 """create
 
@@ -10,7 +11,7 @@ Create Date: 2020-04-22 09:24:25.556995
 """
 from alembic import op
 import sqlalchemy as sa
-from alembic_utils.pg_function import PGFunction
+from alembic_utils_extended.pg_function import PGFunction
 
 # revision identifiers, used by Alembic.
 revision = '1'
@@ -21,9 +22,9 @@ depends_on = None
 
 def upgrade():
     public_to_upper_6fa0de = PGFunction(
-            schema="public",
-            signature="to_upper(some_text text)",
-            definition="""
+        schema="public",
+        signature="to_upper(some_text text)",
+        definition="""
             returns text
             as
             $$ select upper(some_text) $$ language SQL;
@@ -35,10 +36,10 @@ def upgrade():
 
 def downgrade():
     public_to_upper_6fa0de = PGFunction(
-            schema="public",
-            signature="to_upper(some_text text)",
-            definition="# Not Used"
-        )
+        schema="public",
+        signature="to_upper(some_text text)",
+        definition="# Not Used"
+    )
 
     op.drop_entity(public_to_upper_6fa0de)
 ```
@@ -54,7 +55,7 @@ Create Date: 2020-04-22 09:24:25.679031
 """
 from alembic import op
 import sqlalchemy as sa
-from alembic_utils.pg_function import PGFunction
+from alembic_utils_extended.pg_function import PGFunction
 
 # revision identifiers, used by Alembic.
 revision = '2'
@@ -65,9 +66,9 @@ depends_on = None
 
 def upgrade():
     public_to_upper_6fa0de = PGFunction(
-            schema="public",
-            signature="to_upper(some_text text)",
-            definition="""
+        schema="public",
+        signature="to_upper(some_text text)",
+        definition="""
             returns text
             as
             $$ select upper(some_text) || 'def' $$ language SQL;
@@ -79,9 +80,9 @@ def upgrade():
 
 def downgrade():
     public_to_upper_6fa0de = PGFunction(
-            schema="public",
-            signature="to_upper(some_text text)",
-            definition="""returns text
+        schema="public",
+        signature="to_upper(some_text text)",
+        definition="""returns text
      LANGUAGE sql
     AS $function$ select upper(some_text) || 'abc' $function$"""
     )

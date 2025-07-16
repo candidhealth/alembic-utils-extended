@@ -1,6 +1,9 @@
-from alembic_utils.pg_function import PGFunction
-from alembic_utils.replaceable_entity import register_entities, registry
-from alembic_utils.testbase import run_alembic_command
+from alembic_utils_extended.pg_function import PGFunction
+from alembic_utils_extended.replaceable_entity import (
+    register_entities,
+    registry,
+)
+from alembic_utils_extended.testbase import run_alembic_command
 
 
 def to_upper():

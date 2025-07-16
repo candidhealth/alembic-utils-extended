@@ -6,7 +6,7 @@
 ```python
 # migrations/env.py
 
-from alembic_utils.replaceable_entity import register_entities
+from alembic_utils_extended.replaceable_entity import register_entities
 from app.functions import my_function
 from app.views import my_view
 
@@ -17,7 +17,7 @@ register_entities(entities=[my_function, my_view], exclude_schema=['audit'])
     :docstring:
 
 ```python
-from alembic_utils.pg_function import PGFunction
+from alembic_utils_extended.pg_function import PGFunction
 
 to_lower = PGFunction(
     schema="public",
@@ -30,9 +30,8 @@ to_lower = PGFunction(
 ::: alembic_utils.pg_view.PGView
     :docstring:
 
-
 ```python
-from alembic_utils.pg_view import PGView
+from alembic_utils_extended.pg_view import PGView
 
 scifi_books = PGView(
     schema="public",
@@ -44,9 +43,8 @@ scifi_books = PGView(
 ::: alembic_utils.pg_materialized_view.PGMaterializedView
     :docstring:
 
-
 ```python
-from alembic_utils.pg_materialized_view import PGMaterializedView
+from alembic_utils_extended.pg_materialized_view import PGMaterializedView
 
 scifi_books = PGMaterializedView(
     schema="public",
@@ -60,9 +58,8 @@ scifi_books = PGMaterializedView(
 ::: alembic_utils.pg_trigger.PGTrigger
     :docstring:
 
-
 ```python
-from alembic_utils.pg_trigger import PGTrigger
+from alembic_utils_extended.pg_trigger import PGTrigger
 
 trigger = PGTrigger(
     schema="public",
@@ -78,9 +75,8 @@ trigger = PGTrigger(
 ::: alembic_utils.pg_extension.PGExtension
     :docstring:
 
-
 ```python
-from alembic_utils.pg_extension import PGExtension
+from alembic_utils_extended.pg_extension import PGExtension
 
 extension = PGExtension(
     schema="public",
@@ -92,9 +88,8 @@ extension = PGExtension(
 ::: alembic_utils.pg_policy.PGPolicy
     :docstring:
 
-
 ```python
-from alembic_utils.pg_policy import PGPolicy
+from alembic_utils_extended.pg_policy import PGPolicy
 
 policy = PGPolicy(
     schema="public",
@@ -113,9 +108,8 @@ policy = PGPolicy(
 ::: alembic_utils.pg_grant_table.PGGrantTable
     :docstring:
 
-
 ```python
-from alembic_utils.pg_grant_table import PGGrantTable
+from alembic_utils_extended.pg_grant_table import PGGrantTable
 
 grant = PGGrantTable(
     schema="public",

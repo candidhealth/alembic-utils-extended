@@ -4,9 +4,9 @@ from typing import List
 from parse import parse
 from sqlalchemy import text as sql_text
 
-from alembic_utils.exceptions import SQLParseFailure
-from alembic_utils.replaceable_entity import ReplaceableEntity
-from alembic_utils.statement import (
+from alembic_utils_extended.exceptions import SQLParseFailure
+from alembic_utils_extended.replaceable_entity import ReplaceableEntity
+from alembic_utils_extended.statement import (
     escape_colon_for_plpgsql,
     escape_colon_for_sql,
     normalize_whitespace,
@@ -107,7 +107,7 @@ class PGFunction(ReplaceableEntity):
         """Get a list of all functions defined in the db"""
 
         # Prior to postgres 11, pg_proc had different columns
-        # https://github.com/olirice/alembic_utils/issues/12
+        # https://github.com/candidhealth/alembic-utils-extended/issues/12
         PG_GTE_11 = """
             and p.prokind = 'f'
         """

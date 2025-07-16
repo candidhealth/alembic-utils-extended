@@ -6,8 +6,11 @@ from typing import Generator
 from sqlalchemy import text as sql_text
 from sqlalchemy.sql.elements import TextClause
 
-from alembic_utils.replaceable_entity import ReplaceableEntity
-from alembic_utils.statement import coerce_to_unquoted, normalize_whitespace
+from alembic_utils_extended.replaceable_entity import ReplaceableEntity
+from alembic_utils_extended.statement import (
+    coerce_to_unquoted,
+    normalize_whitespace,
+)
 
 
 class PGExtension(ReplaceableEntity):

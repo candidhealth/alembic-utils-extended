@@ -1,9 +1,9 @@
 from typing import TYPE_CHECKING
 
-from alembic_utils.statement import coerce_to_unquoted
+from alembic_utils_extended.statement import coerce_to_unquoted
 
 if TYPE_CHECKING:
-    from alembic_utils.replaceable_entity import ReplaceableEntity
+    from alembic_utils_extended.replaceable_entity import ReplaceableEntity
 
     _Base = ReplaceableEntity
 else:

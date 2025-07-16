@@ -1,16 +1,16 @@
 # Alembic Utils
 
 <p>
-    <a href="https://github.com/olirice/alembic_utils/actions">
-        <img src="https://github.com/olirice/alembic_utils/workflows/Tests/badge.svg" alt="Test Status" height="18">
+    <a href="https://github.com/candidhealth/alembic-utils-extended/actions">
+        <img src="https://github.com/candidhealth/alembic-utils-extended/workflows/Tests/badge.svg" alt="Test Status" height="18">
     </a>
-    <a href="https://github.com/olirice/alembic_utils/actions">
-        <img src="https://github.com/olirice/alembic_utils/workflows/pre-commit%20hooks/badge.svg" alt="Pre-commit Status" height="18">
+    <a href="https://github.com/candidhealth/alembic-utils-extended/actions">
+        <img src="https://github.com/candidhealth/alembic-utils-extended/workflows/pre-commit%20hooks/badge.svg" alt="Pre-commit Status" height="18">
     </a>
-    <a href="https://codecov.io/gh/olirice/alembic_utils"><img src="https://codecov.io/gh/olirice/alembic_utils/branch/master/graph/badge.svg" height="18"></a>
+    <a href="https://codecov.io/gh/candidhealth/alembic-utils-extended"><img src="https://codecov.io/gh/candidhealth/alembic-utils-extended/branch/master/graph/badge.svg" height="18"></a>
 </p>
 <p>
-    <a href="https://github.com/olirice/alembic_utils/blob/master/LICENSE"><img src="https://img.shields.io/pypi/l/markdown-subtemplate.svg" alt="License" height="18"></a>
+    <a href="https://github.com/candidhealth/alembic-utils-extended/blob/master/LICENSE"><img src="https://img.shields.io/pypi/l/markdown-subtemplate.svg" alt="License" height="18"></a>
     <a href="https://badge.fury.io/py/alembic_utils"><img src="https://badge.fury.io/py/alembic_utils.svg" alt="PyPI version" height="18"></a>
     <a href="https://github.com/psf/black">
         <img src="https://img.shields.io/badge/code%20style-black-000000.svg" alt="Codestyle Black" height="18">
@@ -26,7 +26,7 @@
 
 **Documentation**: <a href="https://olirice.github.io/alembic_utils" target="_blank">https://olirice.github.io/alembic_utils</a>
 
-**Source Code**: <a href="https://github.com/olirice/alembic_utils" target="_blank">https://github.com/olirice/alembic_utils</a>
+**Source Code**: <a href="https://github.com/candidhealth/alembic-utils-extended" target="_blank">https://github.com/candidhealth/alembic-utils-extended</a>
 
 ---
 
@@ -42,14 +42,13 @@ Update alembic's `env.py` to register a function or view:
 
 ```python
 # migrations/env.py
-from alembic_utils.pg_function import PGFunction
-from alembic_utils.replaceable_entity import register_entities
-
+from alembic_utils_extended.pg_function import PGFunction
+from alembic_utils_extended.replaceable_entity import register_entities
 
 to_upper = PGFunction(
-  schema='public',
-  signature='to_upper(some_text text)',
-  definition="""
+    schema='public',
+    signature='to_upper(some_text text)',
+    definition="""
   RETURNS text as
   $$
     SELECT upper(some_text)
@@ -79,7 +78,7 @@ Create Date: 2020-04-22 09:24:25.556995
 """
 from alembic import op
 import sqlalchemy as sa
-from alembic_utils.pg_function import PGFunction
+from alembic_utils_extended.pg_function import PGFunction
 
 # revision identifiers, used by Alembic.
 revision = '8efi0da3a4'
@@ -113,7 +112,7 @@ def downgrade():
 ```
 
 
-Visit the [quickstart guide](https://olirice.github.io/alembic_utils/quickstart/) for usage instructions.
+Visit the [quickstart guide](https://candidhealth.github.io/alembic-utils-extended/quickstart/) for usage instructions.
 
 <p align="center">&mdash;&mdash;  &mdash;&mdash;</p>
 

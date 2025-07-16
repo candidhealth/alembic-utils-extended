@@ -46,4 +46,3 @@ context.configure(
     include_object=include_object
 )
 ```
-

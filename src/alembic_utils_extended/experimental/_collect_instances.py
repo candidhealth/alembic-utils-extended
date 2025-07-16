@@ -13,13 +13,13 @@ def walk_modules(module: ModuleType) -> Generator[ModuleType, None, None]:
     """Recursively yield python import paths to submodules in *module*
 
     Example:
-        module_iter = walk_modules(alembic_utils)
+        module_iter = walk_modules(alembic_utils_extended)
 
         for module_path in module_iter:
             print(module_path)
 
-        # alembic_utils.exceptions
-        # alembic_utils.on_entity_mixin
+        # alembic_utils_extended.exceptions
+        # alembic_utils_extended.on_entity_mixin
         # ...
     """
     top_module = module

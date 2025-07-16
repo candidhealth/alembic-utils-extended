@@ -1,10 +1,10 @@
 from parse import parse
 from sqlalchemy import text as sql_text
 
-from alembic_utils.exceptions import SQLParseFailure
-from alembic_utils.on_entity_mixin import OnEntityMixin
-from alembic_utils.replaceable_entity import ReplaceableEntity
-from alembic_utils.statement import coerce_to_quoted
+from alembic_utils_extended.exceptions import SQLParseFailure
+from alembic_utils_extended.on_entity_mixin import OnEntityMixin
+from alembic_utils_extended.replaceable_entity import ReplaceableEntity
+from alembic_utils_extended.statement import coerce_to_quoted
 
 
 class PGPolicy(OnEntityMixin, ReplaceableEntity):

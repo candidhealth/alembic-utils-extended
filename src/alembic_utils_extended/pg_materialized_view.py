@@ -7,9 +7,9 @@ from parse import parse
 from sqlalchemy import text as sql_text
 from sqlalchemy.sql.elements import TextClause
 
-from alembic_utils.exceptions import SQLParseFailure
-from alembic_utils.replaceable_entity import ReplaceableEntity
-from alembic_utils.statement import (
+from alembic_utils_extended.exceptions import SQLParseFailure
+from alembic_utils_extended.replaceable_entity import ReplaceableEntity
+from alembic_utils_extended.statement import (
     coerce_to_unquoted,
     normalize_whitespace,
     strip_terminating_semicolon,

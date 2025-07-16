@@ -4,10 +4,10 @@ from alembic.autogenerate import renderers
 from alembic.operations import MigrateOperation, Operations
 from typing_extensions import Protocol
 
-from alembic_utils.exceptions import UnreachableException
+from alembic_utils_extended.exceptions import UnreachableException
 
 if TYPE_CHECKING:
-    from alembic_utils.replaceable_entity import ReplaceableEntity
+    from alembic_utils_extended.replaceable_entity import ReplaceableEntity
 
 
 class SupportsTarget(Protocol):

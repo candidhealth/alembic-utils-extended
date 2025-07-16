@@ -18,18 +18,18 @@ from alembic.autogenerate.api import AutogenContext
 from sqlalchemy.orm import Session
 from sqlalchemy.sql.elements import TextClause
 
-import alembic_utils
-from alembic_utils.depends import solve_resolution_order
-from alembic_utils.exceptions import UnreachableException
-from alembic_utils.experimental import collect_subclasses
-from alembic_utils.reversible_op import (
+import alembic_utils_extended
+from alembic_utils_extended.depends import solve_resolution_order
+from alembic_utils_extended.exceptions import UnreachableException
+from alembic_utils_extended.experimental import collect_subclasses
+from alembic_utils_extended.reversible_op import (
     CreateOp,
     DropOp,
     ReplaceOp,
     ReversibleOp,
 )
-from alembic_utils.simulate import simulate_entity
-from alembic_utils.statement import (
+from alembic_utils_extended.simulate import simulate_entity
+from alembic_utils_extended.statement import (
     coerce_to_quoted,
     coerce_to_unquoted,
     escape_colon_for_sql,
@@ -213,7 +213,7 @@ class ReplaceableEntityRegistry:
     def allowed_entity_types(self) -> Set[Type[ReplaceableEntity]]:
         if self.entity_types:
             return self.entity_types
-        return set(collect_subclasses(alembic_utils, ReplaceableEntity))
+        return set(collect_subclasses(alembic_utils_extended, ReplaceableEntity))
 
     def entities(self) -> List[ReplaceableEntity]:
         return list(self._entities.values())
@@ -360,7 +360,7 @@ def compare_registered_entities(
     try:
         # All database entities currently live
         # Check if anything needs to drop
-        subclasses = collect_subclasses(alembic_utils, ReplaceableEntity)
+        subclasses = collect_subclasses(alembic_utils_extended, ReplaceableEntity)
         for entity_class in subclasses:
 
             if entity_class not in registry.allowed_entity_types:

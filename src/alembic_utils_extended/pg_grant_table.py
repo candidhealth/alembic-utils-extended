@@ -7,9 +7,12 @@ from sqlalchemy import text as sql_text
 from sqlalchemy.orm import Session
 from sqlalchemy.sql.elements import TextClause
 
-from alembic_utils.exceptions import BadInputException
-from alembic_utils.replaceable_entity import ReplaceableEntity
-from alembic_utils.statement import coerce_to_quoted, coerce_to_unquoted
+from alembic_utils_extended.exceptions import BadInputException
+from alembic_utils_extended.replaceable_entity import ReplaceableEntity
+from alembic_utils_extended.statement import (
+    coerce_to_quoted,
+    coerce_to_unquoted,
+)
 
 
 class PGGrantTableChoice(str, Enum):

@@ -1,4 +1,4 @@
-from alembic_utils.testbase import run_alembic_command
+from alembic_utils_extended.testbase import run_alembic_command
 
 
 def test_current(engine) -> None:

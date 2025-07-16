@@ -1,9 +1,12 @@
 import pytest
 from sqlalchemy.exc import InternalError
 
-from alembic_utils.pg_view import PGView
-from alembic_utils.replaceable_entity import register_entities
-from alembic_utils.testbase import TEST_VERSIONS_ROOT, run_alembic_command
+from alembic_utils_extended.pg_view import PGView
+from alembic_utils_extended.replaceable_entity import register_entities
+from alembic_utils_extended.testbase import (
+    TEST_VERSIONS_ROOT,
+    run_alembic_command,
+)
 
 A = PGView(
     schema="public",
@@ -39,7 +42,7 @@ def test_drop_fails_without_cascade(engine) -> None:
 
     assert "op.drop_entity" in migration_contents
     assert "op.create_entity" in migration_contents
-    assert "from alembic_utils" in migration_contents
+    assert "from alembic_utils_extended" in migration_contents
     assert migration_contents.index("op.drop_entity") < migration_contents.index("op.create_entity")
 
     with pytest.raises(InternalError):
@@ -77,7 +80,7 @@ def test_drop_fails_with_cascade(engine, sess) -> None:
         migration_file.write(migration_contents)
 
     assert "op.create_entity" in migration_contents
-    assert "from alembic_utils" in migration_contents
+    assert "from alembic_utils_extended" in migration_contents
     assert migration_contents.index("op.drop_entity") < migration_contents.index("op.create_entity")
 
     # Cascade drops *B_A* and succeeds
