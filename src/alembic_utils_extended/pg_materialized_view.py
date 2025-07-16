@@ -7,7 +7,8 @@ from alembic.autogenerate.api import AutogenContext
 from alembic.autogenerate.render import _add_index as render_add_index
 from alembic.operations.ops import CreateIndexOp
 from parse import parse
-from sqlalchemy import Index, text as sql_text
+from sqlalchemy import Index
+from sqlalchemy import text as sql_text
 from sqlalchemy.sql.elements import TextClause
 
 from alembic_utils_extended.exceptions import SQLParseFailure

@@ -25,7 +25,7 @@ def maybe_start_pg() -> Generator[None, None, None]:
     """Creates a postgres 12 docker container that can be connected
     to using the PYTEST_DB connection string"""
 
-    container_name = "alembic_utils__extended_pg"
+    container_name = "alembic_utils_pg"
     image = "postgres:13"
 
     connection_template = "postgresql://{user}:{pw}@{host}:{port:d}/{db}"
@@ -129,10 +129,13 @@ def sess(engine) -> Generator[Session, None, None]:
     sess.expire_all()
     sess.close()
 
+
 ExecuteAll = Callable[[Engine | Session, Generator[TextClause, None, None]], None]
+
+
 @pytest.fixture(scope="session")
 def execute_all() -> ExecuteAll:
-    def _execute_all(connection: Engine | Session,  stmts: Generator[TextClause, None, None]):
+    def _execute_all(connection: Engine | Session, stmts: Generator[TextClause, None, None]):
         for stmt in stmts:
             connection.execute(stmt)
 

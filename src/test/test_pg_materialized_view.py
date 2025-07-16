@@ -96,7 +96,7 @@ def test_update_revision(engine, execute_all) -> None:
         TEST_MAT_VIEW.signature,
         """select '1' as c1, *, TRUE as is_updated from pg_matviews""",
         with_data=TEST_MAT_VIEW.with_data,
-        indexes=TEST_MAT_VIEW.indexes
+        indexes=TEST_MAT_VIEW.indexes,
     )
 
     register_entities([UPDATED_TEST_MAT_VIEW], entity_types=[PGMaterializedView])

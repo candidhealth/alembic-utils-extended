@@ -17,15 +17,15 @@
     <a href="https://pypi.org/project/alembic-utils-extended/"><img src="https://img.shields.io/pypi/dm/alembic-utils-extended.svg" alt="Download count" height="18"></a>
 </p>
 <p>
-    <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.9+-blue.svg" alt="Python version" height="18"></a>
+    <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.10+-blue.svg" alt="Python version" height="18"></a>
     <a href=""><img src="https://img.shields.io/badge/postgresql-11+-blue.svg" alt="PostgreSQL version" height="18"></a>
 </p>
 
 **Autogenerate Support for PostgreSQL Functions, Views, Materialized View, Triggers, and Policies**
 
-This is a fork of the much more popular [alembic_utils](https://github.com/candidhealth/alembic-utils-extended) package to extend the
-capabilities of [Alembic](https://alembic.sqlalchemy.org/en/latest/), which adds support for autogenerating a larger
-number of [PostgreSQL](https://www.postgresql.org/) entity types,
+This is a fork of the much more popular [alembic_utils](https://github.com/candidhealth/alembic-utils-extended) package
+to extend the capabilities of [Alembic](https://alembic.sqlalchemy.org/en/latest/), which adds support for
+autogenerating a larger number of [PostgreSQL](https://www.postgresql.org/) entity types,
 including [functions](https://www.postgresql.org/docs/current/sql-createfunction.html), [views](https://www.postgresql.org/docs/current/sql-createview.html), [materialized views](https://www.postgresql.org/docs/current/sql-creatematerializedview.html), [triggers](https://www.postgresql.org/docs/current/sql-createtrigger.html),
 and [policies](https://www.postgresql.org/docs/current/sql-createpolicy.html).
 
@@ -57,24 +57,13 @@ alembic revision --autogenerate -m 'message'
 
 If you have any issues with contributing, please reach out to justin@joincandidhealth.com so that we can work out any
 issues you are having! This is mostly just forked directly
-from [alembic_utils](https://github.com/candidhealth/alembic-utils-extended), so it's possible something is misconfigured.
+from [alembic_utils](https://github.com/candidhealth/alembic-utils-extended), so it's possible something is
+misconfigured.
 
 ### Testing
 
-```
-# install pip dependencies
-pip install wheel && pip install -e ".[dev]"
-
-# run the tests
-pytest src/test
-```
-
-### Linting / Pre-Commit Checks
-
-```
-pip install pre-commit
-pre-commit install
-
-# manually run
-pre-commit run --all
+```bash
+poetry install
+poetry run pre-commit run --all-files
+poetry run pytest
 ```

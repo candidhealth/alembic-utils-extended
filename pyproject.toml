@@ -2,7 +2,7 @@
 name = "alembic-utils-extended"
 version = "0.0.0"
 description = "A sqlalchemy/alembic extension for migrating entities like functions, triggers, views, and materialized views."
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 authors = [{ "name" = "Justin Malin", "email" = "justin@joincandidhealth.com" }]
 license = "MIT"
 readme = "README.md"
@@ -12,7 +12,6 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Intended Audience :: Developers",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
