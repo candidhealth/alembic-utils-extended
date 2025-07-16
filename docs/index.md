@@ -1,4 +1,4 @@
-# Alembic Utils
+# Alembic Utils Extended
 
 <p>
     <a href="https://github.com/candidhealth/alembic-utils-extended/actions">
