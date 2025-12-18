@@ -1,7 +1,7 @@
 [project]
 name = "alembic-utils-extended"
-version = "1.0.1"
-description = "A sqlalchemy/alembic extension for migrating entities like functions, triggers, views, and materialized views."
+version = "1.1.0"
+description = "A sqlalchemy/alembic extension for migrating entities like functions, triggers, views, materialized views, and check constraints."
 requires-python = ">=3.10"
 authors = [{ "name" = "Justin Malin", "email" = "justin@joincandidhealth.com" }]
 license = "MIT"

@@ -13,11 +13,8 @@ config = context.config
 # This line sets up loggers basically.
 fileConfig(config.config_file_name)
 
-# add your model's MetaData object here
-# for 'autogenerate' support
-# from myapp import mymodel
-# target_metadata = mymodel.Base.metadata
-target_metadata = MetaData()
+target_metadata = config.attributes.get("target_metadata", MetaData())
+compare_check_constraints = config.attributes.get("compare_check_constraints", False)
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:
@@ -66,6 +63,7 @@ def run_migrations_online():
             include_schemas=True,
             include_object=include_object,
             include_name=include_name,
+            compare_check_constraints=compare_check_constraints,
         )
 
         with context.begin_transaction():

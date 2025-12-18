@@ -18,8 +18,8 @@ repos:
       args: ['--multi-line=3', '--trailing-comma', '--force-grid-wrap=0', '--use-parentheses']
 
 
--   repo: https://github.com/humitos/mirrors-autoflake
-    rev: v1.1
+-   repo: https://github.com/PyCQA/autoflake
+    rev: v2.2.1
     hooks:
     -   id: autoflake
         args: ['--in-place', '--remove-all-unused-imports']
