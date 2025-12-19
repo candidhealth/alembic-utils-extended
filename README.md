@@ -26,8 +26,10 @@
 This is a fork of the much more popular [alembic_utils](https://github.com/olirice/alembic_utils) package
 to extend the capabilities of [Alembic](https://alembic.sqlalchemy.org/en/latest/), which adds support for
 autogenerating a larger number of [PostgreSQL](https://www.postgresql.org/) entity types,
-including [functions](https://www.postgresql.org/docs/current/sql-createfunction.html), [views](https://www.postgresql.org/docs/current/sql-createview.html), [materialized views](https://www.postgresql.org/docs/current/sql-creatematerializedview.html), [triggers](https://www.postgresql.org/docs/current/sql-createtrigger.html),
-[policies](https://www.postgresql.org/docs/current/sql-createpolicy.html), and [check constraints](https://www.postgresql.org/docs/current/ddl-constraints.html#DDL-CONSTRAINTS-CHECK-CONSTRAINTS).
+including [functions](https://www.postgresql.org/docs/current/sql-createfunction.html), [views](https://www.postgresql.org/docs/current/sql-createview.html), [materialized views](https://www.postgresql.org/docs/current/sql-creatematerializedview.html), [triggers](https://www.postgresql.org/docs/current/sql-createtrigger.html), and
+[policies](https://www.postgresql.org/docs/current/sql-createpolicy.html).
+
+This repo adds additional support for defining indices for materialized views and autogenerating [check constraints](https://www.postgresql.org/docs/current/ddl-constraints.html#DDL-CONSTRAINTS-CHECK-CONSTRAINTS).
 
 ## Quickstart
 
