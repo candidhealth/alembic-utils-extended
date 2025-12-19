@@ -21,13 +21,13 @@
     <a href=""><img src="https://img.shields.io/badge/postgresql-11+-blue.svg" alt="PostgreSQL version" height="18"></a>
 </p>
 
-**Autogenerate Support for PostgreSQL Functions, Views, Materialized View, Triggers, and Policies**
+**Autogenerate Support for PostgreSQL Functions, Views, Materialized Views, Triggers, Policies, and Check Constraints**
 
-This is a fork of the much more popular [alembic_utils](https://github.com/candidhealth/alembic-utils-extended) package
+This is a fork of the much more popular [alembic_utils](https://github.com/olirice/alembic_utils) package
 to extend the capabilities of [Alembic](https://alembic.sqlalchemy.org/en/latest/), which adds support for
 autogenerating a larger number of [PostgreSQL](https://www.postgresql.org/) entity types,
 including [functions](https://www.postgresql.org/docs/current/sql-createfunction.html), [views](https://www.postgresql.org/docs/current/sql-createview.html), [materialized views](https://www.postgresql.org/docs/current/sql-creatematerializedview.html), [triggers](https://www.postgresql.org/docs/current/sql-createtrigger.html),
-and [policies](https://www.postgresql.org/docs/current/sql-createpolicy.html).
+[policies](https://www.postgresql.org/docs/current/sql-createpolicy.html), and [check constraints](https://www.postgresql.org/docs/current/ddl-constraints.html#DDL-CONSTRAINTS-CHECK-CONSTRAINTS).
 
 ## Quickstart
 
@@ -53,11 +53,44 @@ populate the migration script.
 alembic revision --autogenerate -m 'message'
 ```
 
+## Check Constraint Autogeneration
+
+This package also adds autogenerate support for check constraints defined in SQLAlchemy models. To enable:
+
+```python
+# migrations/env.py
+from alembic import context
+
+context.configure(
+    # ... other configurations ...
+    compare_check_constraints=True,
+)
+```
+
+Check constraints must be named to be detected:
+
+```python
+from sqlalchemy import CheckConstraint, Column, Integer
+from sqlalchemy.ext.declarative import declarative_base
+
+Base = declarative_base()
+
+class Order(Base):
+    __tablename__ = "orders"
+
+    id = Column(Integer, primary_key=True)
+    amount = Column(Integer)
+
+    __table_args__ = (
+        CheckConstraint("amount >= 0", name="ck_orders_amount_positive"),
+    )
+```
+
 ## Contributing
 
 If you have any issues with contributing, please reach out to justin@joincandidhealth.com so that we can work out any
 issues you are having! This is mostly just forked directly
-from [alembic_utils](https://github.com/candidhealth/alembic-utils-extended), so it's possible something is
+from [alembic_utils](https://github.com/olirice/alembic_utils), so it's possible something is
 misconfigured.
 
 ### Testing
