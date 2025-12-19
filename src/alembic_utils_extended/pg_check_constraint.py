@@ -157,6 +157,7 @@ def _get_database_check_constraints(
             continue
 
         enum_constraint_names = _get_enum_constraint_names(table)
+        manual_constraint_names = _get_manual_check_constraint_names(table)
 
         try:
             db_constraints = inspector.get_check_constraints(table.name, schema=schema)
@@ -168,7 +169,7 @@ def _get_database_check_constraints(
             if c.get("name") is None:
                 continue
 
-            if c["name"] in enum_constraint_names:
+            if c["name"] in enum_constraint_names and c["name"] not in manual_constraint_names:
                 continue
 
             constraints.append(
@@ -187,6 +188,14 @@ def _get_enum_constraint_names(table) -> Set[str]:
     for column in table.columns:
         if isinstance(column.type, Enum) and not getattr(column.type, "native_enum", True):
             constraint_names.add(f"{table.name}_{column.name}_check")
+    return constraint_names
+
+
+def _get_manual_check_constraint_names(table) -> Set[str]:
+    constraint_names = set()
+    for constraint in table.constraints:
+        if isinstance(constraint, CheckConstraint) and constraint.name is not None:
+            constraint_names.add(constraint.name)
     return constraint_names
 
 

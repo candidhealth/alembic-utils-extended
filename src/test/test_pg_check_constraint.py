@@ -1,10 +1,19 @@
 import pytest
 from alembic.operations import ops
-from sqlalchemy import CheckConstraint, Column, Integer, MetaData, Table, text
+from sqlalchemy import (
+    CheckConstraint,
+    Column,
+    Enum,
+    Integer,
+    MetaData,
+    Table,
+    text,
+)
 
 from alembic_utils_extended.pg_check_constraint import (
     _constraint_columns_exist_in_metadata,
     _constraint_columns_exist_on_table,
+    _get_enum_constraint_names,
     _render_create_check_constraint,
 )
 from alembic_utils_extended.testbase import (
@@ -350,3 +359,79 @@ def test_constraint_referencing_nonexistent_column_raises_error() -> None:
 
     with pytest.raises(ValueError, match="references columns that do not exist in any table"):
         _get_model_check_constraints(target_metadata, None)
+
+
+def test_get_enum_constraint_names_with_non_native_enum() -> None:
+    metadata = MetaData()
+    table = Table(
+        "test_table",
+        metadata,
+        Column("id", Integer, primary_key=True),
+        Column(
+            "status",
+            Enum("active", "inactive", native_enum=False),
+        ),
+    )
+
+    enum_names = _get_enum_constraint_names(table)
+
+    assert "test_table_status_check" in enum_names
+
+
+def test_get_enum_constraint_names_with_native_enum() -> None:
+    metadata = MetaData()
+    table = Table(
+        "test_table",
+        metadata,
+        Column("id", Integer, primary_key=True),
+        Column(
+            "status",
+            Enum("active", "inactive", native_enum=True),
+        ),
+    )
+
+    enum_names = _get_enum_constraint_names(table)
+
+    assert len(enum_names) == 0
+
+
+def test_manual_constraint_with_enum_name_not_filtered(engine) -> None:
+    metadata = MetaData()
+    table = Table(
+        "test_table",
+        metadata,
+        Column("id", Integer, primary_key=True),
+        Column(
+            "source",
+            Enum("val1", "val2", native_enum=False),
+        ),
+        CheckConstraint("source ~ '^[^#]+$'", name="test_table_source_check"),
+    )
+
+    with engine.begin() as connection:
+        metadata.create_all(connection)
+
+    with engine.begin() as connection:
+        connection.execute(text("ALTER TABLE test_table DROP CONSTRAINT IF EXISTS test_table_source_check"))
+        connection.execute(text("ALTER TABLE test_table ADD CONSTRAINT test_table_source_check CHECK (source ~ '^[^#]+$')"))
+
+    output = run_alembic_command(
+        engine=engine,
+        command="revision",
+        command_kwargs={
+            "autogenerate": True,
+            "rev_id": "1",
+            "message": "no_change",
+        },
+        target_metadata=metadata,
+        compare_check_constraints=True,
+    )
+
+    migration_path = TEST_VERSIONS_ROOT / "1_no_change.py"
+
+    with migration_path.open() as migration_file:
+        migration_contents = migration_file.read()
+
+    assert "test_table_source_check" not in migration_contents
+    assert "op.create_check_constraint" not in migration_contents
+    assert "op.drop_constraint" not in migration_contents
