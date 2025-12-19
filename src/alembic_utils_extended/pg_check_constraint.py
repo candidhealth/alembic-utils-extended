@@ -124,6 +124,15 @@ def _get_model_check_constraints(metadata, schema: Optional[str]) -> List[Dict[s
                         f"Constraint: {constraint.sqltext}"
                     )
 
+                if not _constraint_columns_exist_on_table(constraint, table):
+                    if not _constraint_columns_exist_in_metadata(constraint, metadata):
+                        raise ValueError(
+                            f"Check constraint '{constraint.name}' on table '{table.name}' "
+                            f"references columns that do not exist in any table. "
+                            f"Constraint: {constraint.sqltext}"
+                        )
+                    continue
+
                 sqltext = str(constraint.sqltext)
                 constraints.append(
                     {
@@ -179,3 +188,27 @@ def _get_enum_constraint_names(table) -> Set[str]:
         if isinstance(column.type, Enum) and not getattr(column.type, "native_enum", True):
             constraint_names.add(f"{table.name}_{column.name}_check")
     return constraint_names
+
+
+def _constraint_columns_exist_on_table(constraint: CheckConstraint, table) -> bool:
+    table_column_names = {col.name for col in table.columns}
+    constraint_columns = getattr(constraint, "columns", None)
+    if constraint_columns is not None and len(constraint_columns) > 0:
+        for col in constraint_columns:
+            if col.name not in table_column_names:
+                return False
+    return True
+
+
+def _constraint_columns_exist_in_metadata(constraint: CheckConstraint, metadata) -> bool:
+    all_column_names: Set[str] = set()
+    for table in metadata.tables.values():
+        for col in table.columns:
+            all_column_names.add(col.name)
+
+    constraint_columns = getattr(constraint, "columns", None)
+    if constraint_columns is not None and len(constraint_columns) > 0:
+        for col in constraint_columns:
+            if col.name not in all_column_names:
+                return False
+    return True

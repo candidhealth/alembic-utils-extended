@@ -3,6 +3,8 @@ from alembic.operations import ops
 from sqlalchemy import CheckConstraint, Column, Integer, MetaData, Table, text
 
 from alembic_utils_extended.pg_check_constraint import (
+    _constraint_columns_exist_in_metadata,
+    _constraint_columns_exist_on_table,
     _render_create_check_constraint,
 )
 from alembic_utils_extended.testbase import (
@@ -260,3 +262,91 @@ def test_renderer_includes_schema_and_kwargs() -> None:
 
     assert "schema='myschema'" in rendered
     assert "postgresql_not_valid=True" in rendered
+
+
+def test_constraint_with_missing_columns_skipped() -> None:
+    metadata = MetaData()
+    parent_table = Table(
+        "parent_table",
+        metadata,
+        Column("id", Integer, primary_key=True),
+        Column("parent_column", Integer),
+    )
+    child_table = Table(
+        "child_table",
+        metadata,
+        Column("id", Integer, primary_key=True),
+        Column("child_column", Integer),
+    )
+
+    constraint_on_parent = CheckConstraint(
+        parent_table.c.parent_column > 0,
+        name="ck_parent_column_positive",
+    )
+
+    assert _constraint_columns_exist_on_table(constraint_on_parent, parent_table) is True
+    assert _constraint_columns_exist_on_table(constraint_on_parent, child_table) is False
+
+
+def test_constraint_columns_exist_in_metadata() -> None:
+    metadata = MetaData()
+    parent_table = Table(
+        "parent_table",
+        metadata,
+        Column("id", Integer, primary_key=True),
+        Column("parent_column", Integer),
+    )
+    Table(
+        "child_table",
+        metadata,
+        Column("id", Integer, primary_key=True),
+        Column("child_column", Integer),
+    )
+
+    constraint_on_parent = CheckConstraint(
+        parent_table.c.parent_column > 0,
+        name="ck_parent_column_positive",
+    )
+
+    assert _constraint_columns_exist_in_metadata(constraint_on_parent, metadata) is True
+
+    orphan_metadata = MetaData()
+    Table(
+        "orphan_table",
+        orphan_metadata,
+        Column("id", Integer, primary_key=True),
+        Column("other_column", Integer),
+    )
+
+    assert _constraint_columns_exist_in_metadata(constraint_on_parent, orphan_metadata) is False
+
+
+def test_constraint_referencing_nonexistent_column_raises_error() -> None:
+    from alembic_utils_extended.pg_check_constraint import (
+        _get_model_check_constraints,
+    )
+
+    source_metadata = MetaData()
+    source_table = Table(
+        "source_table",
+        source_metadata,
+        Column("id", Integer, primary_key=True),
+        Column("source_column", Integer),
+    )
+
+    target_metadata = MetaData()
+    target_table = Table(
+        "target_table",
+        target_metadata,
+        Column("id", Integer, primary_key=True),
+        Column("different_column", Integer),
+    )
+    target_table.append_constraint(
+        CheckConstraint(
+            source_table.c.source_column > 0,
+            name="ck_nonexistent_column",
+        )
+    )
+
+    with pytest.raises(ValueError, match="references columns that do not exist in any table"):
+        _get_model_check_constraints(target_metadata, None)
