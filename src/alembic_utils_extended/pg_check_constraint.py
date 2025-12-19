@@ -6,7 +6,7 @@ from typing import Dict, List, Optional, Set, Union
 from alembic.autogenerate import comparators, renderers
 from alembic.autogenerate.api import AutogenContext
 from alembic.operations import ops
-from sqlalchemy import CheckConstraint
+from sqlalchemy import CheckConstraint, Enum
 from sqlalchemy.engine.reflection import Inspector
 
 logger = logging.getLogger(__name__)
@@ -147,6 +147,8 @@ def _get_database_check_constraints(
         if table.schema != schema:
             continue
 
+        enum_constraint_names = _get_enum_constraint_names(table)
+
         try:
             db_constraints = inspector.get_check_constraints(table.name, schema=schema)
         except NotImplementedError:
@@ -155,6 +157,9 @@ def _get_database_check_constraints(
 
         for c in db_constraints:
             if c.get("name") is None:
+                continue
+
+            if c["name"] in enum_constraint_names:
                 continue
 
             constraints.append(
@@ -166,3 +171,11 @@ def _get_database_check_constraints(
             )
 
     return constraints
+
+
+def _get_enum_constraint_names(table) -> Set[str]:
+    constraint_names = set()
+    for column in table.columns:
+        if isinstance(column.type, Enum) and not getattr(column.type, "native_enum", True):
+            constraint_names.add(f"{table.name}_{column.name}_check")
+    return constraint_names
