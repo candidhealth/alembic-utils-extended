@@ -8,6 +8,7 @@ from alembic.autogenerate.api import AutogenContext
 from alembic.operations import ops
 from sqlalchemy import CheckConstraint, Enum
 from sqlalchemy.engine.reflection import Inspector
+from sqlalchemy.exc import NoSuchTableError
 
 logger = logging.getLogger(__name__)
 
@@ -164,6 +165,9 @@ def _get_database_check_constraints(
         except NotImplementedError:
             logger.warning("Database dialect does not support get_check_constraints. " "Check constraint autogenerate is not available.")
             return []
+        # This may occur when the table is being generated in the current migration.
+        except NoSuchTableError:
+            continue
 
         for c in db_constraints:
             if c.get("name") is None:

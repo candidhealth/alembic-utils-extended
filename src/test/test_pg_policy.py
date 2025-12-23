@@ -197,3 +197,29 @@ def test_drop_revision(engine, schema_setup, execute_all) -> None:
     run_alembic_command(engine=engine, command="upgrade", command_kwargs={"revision": "head"})
     # Execute Downgrade
     run_alembic_command(engine=engine, command="downgrade", command_kwargs={"revision": "base"})
+
+
+def test_policy_on_nonexistent_table_creates_entity(engine) -> None:
+    policy_on_new_table = PGPolicy(
+        schema="public",
+        signature="new_table_policy",
+        on_entity="public.nonexistent_table",
+        definition="using (true)",
+    )
+
+    register_entities([policy_on_new_table], entity_types=[PGPolicy])
+
+    output = run_alembic_command(
+        engine=engine,
+        command="revision",
+        command_kwargs={"autogenerate": True, "rev_id": "1", "message": "create_policy_new_table"},
+    )
+
+    migration_create_path = TEST_VERSIONS_ROOT / "1_create_policy_new_table.py"
+
+    with migration_create_path.open() as migration_file:
+        migration_contents = migration_file.read()
+
+    assert "op.create_entity" in migration_contents
+    assert "new_table_policy" in migration_contents
+    assert "from alembic_utils_extended.pg_policy import PGPolicy" in migration_contents
