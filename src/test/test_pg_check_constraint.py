@@ -435,3 +435,26 @@ def test_manual_constraint_with_enum_name_not_filtered(engine) -> None:
     assert "test_table_source_check" not in migration_contents
     assert "op.create_check_constraint" not in migration_contents
     assert "op.drop_constraint" not in migration_contents
+
+
+def test_table_not_in_database_does_not_error(engine) -> None:
+    metadata = MetaData()
+    Table(
+        "new_table_not_in_db",
+        metadata,
+        Column("id", Integer, primary_key=True),
+        Column("amount", Integer),
+        CheckConstraint("amount >= 0", name="ck_new_table_amount_positive"),
+    )
+
+    run_alembic_command(
+        engine=engine,
+        command="revision",
+        command_kwargs={
+            "autogenerate": True,
+            "rev_id": "1",
+            "message": "new_table",
+        },
+        target_metadata=metadata,
+        compare_check_constraints=True,
+    )

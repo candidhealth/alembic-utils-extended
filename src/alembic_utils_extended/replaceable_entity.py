@@ -15,6 +15,7 @@ from typing import (
 
 from alembic.autogenerate import comparators
 from alembic.autogenerate.api import AutogenContext
+from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.orm import Session
 from sqlalchemy.sql.elements import TextClause
 
@@ -340,6 +341,17 @@ def compare_registered_entities(
                     entity.identity,
                 )
 
+        except ProgrammingError as e:
+            if "UndefinedTable" in str(type(e.orig).__name__) or "does not exist" in str(e.orig):
+                logger.info(
+                    "Table for %s %s does not exist yet - assuming new table, creating entity",
+                    entity.__class__.__name__,
+                    entity.identity,
+                )
+                upgrade_ops.ops.append(CreateOp(entity))
+                has_create_or_update_op.append(entity)
+            else:
+                raise
         finally:
             sess.rollback()
 
