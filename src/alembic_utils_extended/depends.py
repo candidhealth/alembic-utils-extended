@@ -1,6 +1,6 @@
 import logging
 from contextlib import contextmanager
-from typing import Generator, List
+from typing import Generator
 
 from sqlalchemy import exc as sqla_exc
 from sqlalchemy.orm import Session
@@ -86,7 +86,7 @@ def recreate_dropped(connection) -> Generator[Session, None, None]:
 
     # Do not include permissions here e.g. PGGrantTable. If columns granted to users are dropped, it will cause an error
 
-    def collect_all_db_entities(sess: Session) -> List[ReplaceableEntity]:
+    def collect_all_db_entities(sess: Session) -> list[ReplaceableEntity]:
         """Collect all entities from the database"""
 
         return [

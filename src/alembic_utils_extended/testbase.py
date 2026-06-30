@@ -3,7 +3,7 @@ import contextlib
 import os
 from io import StringIO
 from pathlib import Path
-from typing import Any, Callable, Dict, NoReturn, Optional
+from typing import Any, Callable, NoReturn
 
 from alembic import command as alem_command
 from alembic.config import Config
@@ -15,7 +15,7 @@ TEST_RESOURCE_ROOT = REPO_ROOT / "src" / "test" / "resources"
 TEST_VERSIONS_ROOT = REPO_ROOT / "src" / "test" / "alembic_config" / "versions"
 
 
-ALEMBIC_COMMAND_MAP: Dict[str, Callable[..., NoReturn]] = {
+ALEMBIC_COMMAND_MAP: dict[str, Callable[..., NoReturn]] = {
     "upgrade": alem_command.upgrade,
     "downgrade": alem_command.downgrade,
     "revision": alem_command.revision,
@@ -39,8 +39,8 @@ def build_alembic_config(engine: Engine) -> Config:
 def run_alembic_command(
     engine: Engine,
     command: str,
-    command_kwargs: Dict[str, Any],
-    target_metadata: Optional[MetaData] = None,
+    command_kwargs: dict[str, Any],
+    target_metadata: MetaData | None = None,
     compare_check_constraints: bool = False,
     compare_expression_indexes: bool = False,
 ) -> str:

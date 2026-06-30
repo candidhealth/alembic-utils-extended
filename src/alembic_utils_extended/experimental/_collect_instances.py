@@ -2,7 +2,7 @@ import importlib
 import os
 from pathlib import Path
 from types import ModuleType
-from typing import Generator, List, Type, TypeVar
+from typing import Generator, TypeVar
 
 from flupy import walk_files
 
@@ -48,13 +48,13 @@ def walk_modules(module: ModuleType) -> Generator[ModuleType, None, None]:
                     yield module
 
 
-def collect_instances(module: ModuleType, class_: Type[T]) -> List[T]:
+def collect_instances(module: ModuleType, class_: type[T]) -> list[T]:
     """Collect all instances of *class_* defined in *module*
 
     Note: Will import all submodules in *module*. Beware of import side effects
     """
 
-    found: List[T] = []
+    found: list[T] = []
 
     for module_ in walk_modules(module):
 
@@ -67,13 +67,13 @@ def collect_instances(module: ModuleType, class_: Type[T]) -> List[T]:
     return found
 
 
-def collect_subclasses(module: ModuleType, class_: Type[T]) -> List[Type[T]]:
+def collect_subclasses(module: ModuleType, class_: type[T]) -> list[type[T]]:
     """Collect all subclasses of *class_* currently imported or defined in *module*
 
     Note: Will import all submodules in *module*. Beware of import side effects
     """
 
-    found: List[Type[T]] = []
+    found: list[type[T]] = []
 
     for module_ in walk_modules(module):
 
@@ -85,6 +85,6 @@ def collect_subclasses(module: ModuleType, class_: Type[T]) -> List[Type[T]]:
                 # argument 2 to issubclass must be a class ....
                 pass
 
-    imported: List[Type[T]] = list(class_.__subclasses__())  # type: ignore
+    imported: list[type[T]] = list(class_.__subclasses__())  # type: ignore
 
     return list(set(found + imported))

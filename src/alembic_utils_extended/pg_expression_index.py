@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Dict, List, Optional, Set, TypedDict, Union
+from typing import TypedDict
 
 from alembic.autogenerate import comparators
 from alembic.autogenerate.api import AutogenContext
@@ -17,16 +17,16 @@ logger = logging.getLogger(__name__)
 
 class _ExpressionIndexKw(TypedDict, total=False):
     postgresql_using: str
-    postgresql_ops: Dict[str, str]
+    postgresql_ops: dict[str, str]
     postgresql_where: str
-    postgresql_include: List[str]
+    postgresql_include: list[str]
 
 
 class _ExpressionIndexInfo(TypedDict):
     table_name: str
     name: str
-    columns: List[Union[str, TextClause]]
-    expressions: List[str]
+    columns: list[str | TextClause]
+    expressions: list[str]
     unique: bool
     kw: _ExpressionIndexKw
 
@@ -35,7 +35,7 @@ class _ExpressionIndexInfo(TypedDict):
 def compare_expression_indexes(
     autogen_context: AutogenContext,
     upgrade_ops: ops.UpgradeOps,
-    _schemas: List[Optional[str]],
+    _schemas: list[str | None],
 ) -> None:
     if not autogen_context.opts.get("compare_expression_indexes"):
         return
@@ -46,7 +46,7 @@ def compare_expression_indexes(
     if target_metadata is None:
         return
 
-    observed_schemas: Set[Optional[str]] = {table.schema for table in target_metadata.tables.values()}
+    observed_schemas: set[str | None] = {table.schema for table in target_metadata.tables.values()}
 
     for schema_to_use in observed_schemas:
 
@@ -116,8 +116,8 @@ def _is_expression_index(index: Index) -> bool:
     return False
 
 
-def _get_model_expression_indexes(metadata, schema: Optional[str], autogen_context: Optional[AutogenContext] = None) -> List[_ExpressionIndexInfo]:
-    indexes: List[_ExpressionIndexInfo] = []
+def _get_model_expression_indexes(metadata, schema: str | None, autogen_context: AutogenContext | None = None) -> list[_ExpressionIndexInfo]:
+    indexes: list[_ExpressionIndexInfo] = []
 
     for table in metadata.tables.values():
         if table.schema != schema:
@@ -194,7 +194,7 @@ def _raise_if_string_arg_matches_column_name(expr, table, index_name: str) -> No
             )
 
 
-def _render_index_expression(expr, autogen_context: Optional[AutogenContext]) -> str:
+def _render_index_expression(expr, autogen_context: AutogenContext | None) -> str:
     """Render a SQLAlchemy expression as a SQL string suitable for CREATE INDEX.
 
     Delegates to Alembic's `render_ddl_sql_expr`, which supplies the right compile
@@ -209,9 +209,9 @@ def _render_index_expression(expr, autogen_context: Optional[AutogenContext]) ->
 def _get_database_expression_indexes(
     inspector: Inspector,
     metadata,
-    schema: Optional[str],
-) -> List[_ExpressionIndexInfo]:
-    indexes: List[_ExpressionIndexInfo] = []
+    schema: str | None,
+) -> list[_ExpressionIndexInfo]:
+    indexes: list[_ExpressionIndexInfo] = []
 
     for table in metadata.tables.values():
         if table.schema != schema:

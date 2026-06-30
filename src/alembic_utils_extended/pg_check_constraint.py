@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-from typing import Dict, List, Optional, Set
 
 from alembic.autogenerate import comparators, renderers
 from alembic.autogenerate.api import AutogenContext
@@ -37,7 +36,7 @@ renderers._registry[(ops.CreateCheckConstraintOp, "default")] = _render_create_c
 def compare_check_constraints(
     autogen_context: AutogenContext,
     upgrade_ops: ops.UpgradeOps,
-    _schemas: List[Optional[str]],
+    _schemas: list[str | None],
 ) -> None:
     if not autogen_context.opts.get("compare_check_constraints"):
         return
@@ -48,7 +47,7 @@ def compare_check_constraints(
     if target_metadata is None:
         return
 
-    observed_schemas: Set[Optional[str]] = {table.schema for table in target_metadata.tables.values()}
+    observed_schemas: set[str | None] = {table.schema for table in target_metadata.tables.values()}
 
     for schema_to_use in observed_schemas:
 
@@ -99,7 +98,7 @@ def compare_check_constraints(
             upgrade_ops.ops.append(drop_op)
 
 
-def _get_model_check_constraints(metadata, schema: Optional[str]) -> List[Dict[str, str]]:
+def _get_model_check_constraints(metadata, schema: str | None) -> list[dict[str, str]]:
     constraints = []
 
     for table in metadata.tables.values():
@@ -139,8 +138,8 @@ def _get_model_check_constraints(metadata, schema: Optional[str]) -> List[Dict[s
 def _get_database_check_constraints(
     inspector: Inspector,
     metadata,
-    schema: Optional[str],
-) -> List[Dict[str, str]]:
+    schema: str | None,
+) -> list[dict[str, str]]:
     constraints = []
 
     for table in metadata.tables.values():
@@ -177,7 +176,7 @@ def _get_database_check_constraints(
     return constraints
 
 
-def _get_enum_constraint_names(table) -> Set[str]:
+def _get_enum_constraint_names(table) -> set[str]:
     constraint_names = set()
     for column in table.columns:
         if isinstance(column.type, Enum) and not getattr(column.type, "native_enum", True):
@@ -185,7 +184,7 @@ def _get_enum_constraint_names(table) -> Set[str]:
     return constraint_names
 
 
-def _get_manual_check_constraint_names(table) -> Set[str]:
+def _get_manual_check_constraint_names(table) -> set[str]:
     constraint_names = set()
     for constraint in table.constraints:
         if isinstance(constraint, CheckConstraint) and constraint.name is not None:
@@ -204,7 +203,7 @@ def _constraint_columns_exist_on_table(constraint: CheckConstraint, table) -> bo
 
 
 def _constraint_columns_exist_in_metadata(constraint: CheckConstraint, metadata) -> bool:
-    all_column_names: Set[str] = set()
+    all_column_names: set[str] = set()
     for table in metadata.tables.values():
         for col in table.columns:
             all_column_names.add(col.name)
