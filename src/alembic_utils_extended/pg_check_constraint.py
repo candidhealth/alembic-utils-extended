@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Dict, List, Optional, Set, Union
+from typing import Dict, List, Optional, Set
 
 from alembic.autogenerate import comparators, renderers
 from alembic.autogenerate.api import AutogenContext
@@ -37,15 +37,9 @@ renderers._registry[(ops.CreateCheckConstraintOp, "default")] = _render_create_c
 def compare_check_constraints(
     autogen_context: AutogenContext,
     upgrade_ops: ops.UpgradeOps,
-    schemas: List[Optional[str]],
+    _schemas: List[Optional[str]],
 ) -> None:
-    compare_check_constraints_opt: Union[bool, List[str], None] = autogen_context.opts.get("compare_check_constraints")
-
-    if not compare_check_constraints_opt:
-        return
-
-    connection = autogen_context.connection
-    if connection is None:
+    if not autogen_context.opts.get("compare_check_constraints"):
         return
 
     inspector: Inspector = autogen_context.inspector
@@ -54,13 +48,9 @@ def compare_check_constraints(
     if target_metadata is None:
         return
 
-    if isinstance(compare_check_constraints_opt, list):
-        observed_schemas: Set[str] = set(compare_check_constraints_opt)
-    else:
-        observed_schemas = {"public"}
+    observed_schemas: Set[Optional[str]] = {table.schema for table in target_metadata.tables.values()}
 
-    for schema in observed_schemas:
-        schema_to_use = schema if schema != "public" else None
+    for schema_to_use in observed_schemas:
 
         model_constraints = _get_model_check_constraints(target_metadata, schema_to_use)
         db_constraints = _get_database_check_constraints(inspector, target_metadata, schema_to_use)

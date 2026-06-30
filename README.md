@@ -64,6 +64,34 @@ context.configure(
 )
 ```
 
+### Monitor Expression Indexes
+
+Alembic's built-in autogenerate silently skips expression indexes (`Index("ix_foo", func.lower(table.c.x))`) because it
+can't reliably reflect functional-index definitions from `pg_indexes`. With `compare_expression_indexes=True`,
+alembic_utils_extended detects new and removed expression indexes by name and emits the corresponding
+`op.create_index` / `op.drop_index`. Expression indexes must be named.
+
+```python
+# migrations/env.py
+from alembic import context
+
+context.configure(
+    # ... other configurations ...
+    compare_expression_indexes=True,
+)
+```
+
+**Content changes under a stable name are not detected.** Comparison is identity-only (`(table_name, index_name)` set
+diff). If the same index name exists in both the model and the database, autogenerate raises rather than silently miss
+an expression change — to evolve the expression, rename the index (which produces a drop + create).
+
+**Common pitfalls the comparator catches at autogenerate time:**
+
+- **`func.X("col_name")` anti-pattern** — bare strings inside `func.X(...)` are treated as bound-parameter literal
+  values, not column references. The resulting index is on the constant string, not the column. Use
+  `func.X(table.c.col_name)` or `func.X(literal_column("col_name"))` instead. The comparator raises with a remediation
+  hint when it detects this.
+
 ### Autogeneration
 
 The next time you autogenerate a revision, Alembic will detect if your entities are new, updated, or removed and
