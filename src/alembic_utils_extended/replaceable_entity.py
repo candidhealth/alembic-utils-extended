@@ -2,16 +2,7 @@
 import logging
 from itertools import zip_longest
 from pathlib import Path
-from typing import (
-    Dict,
-    Generator,
-    Iterable,
-    List,
-    Optional,
-    Set,
-    Type,
-    TypeVar,
-)
+from typing import Generator, Iterable, TypeVar
 
 from alembic.autogenerate import comparators
 from alembic.autogenerate.api import AutogenContext
@@ -61,7 +52,7 @@ class ReplaceableEntity:
         raise NotImplementedError()
 
     @classmethod
-    def from_sql(cls: Type[T], sql: str) -> T:
+    def from_sql(cls: type[T], sql: str) -> T:
         """Create an instance from a SQL string"""
         raise NotImplementedError()
 
@@ -73,14 +64,14 @@ class ReplaceableEntity:
         return coerce_to_quoted(self.schema)
 
     @classmethod
-    def from_path(cls: Type[T], path: Path) -> T:
+    def from_path(cls: type[T], path: Path) -> T:
         """Create an instance instance from a SQL file path"""
         with path.open() as sql_file:
             sql = sql_file.read()
         return cls.from_sql(sql)
 
     @classmethod
-    def from_database(cls, sess: Session, schema="%") -> List[T]:
+    def from_database(cls, sess: Session, schema="%") -> list[T]:
         """Collect existing entities from the database for given schema"""
         raise NotImplementedError()
 
@@ -96,7 +87,7 @@ class ReplaceableEntity:
         """Generates a SQL "create or replace function" statement for PGFunction"""
         raise NotImplementedError()
 
-    def get_database_definition(self: T, sess: Session, dependencies: Optional[List["ReplaceableEntity"]] = None) -> T:  # $Optional[T]:
+    def get_database_definition(self: T, sess: Session, dependencies: list["ReplaceableEntity"] | None = None) -> T:  # T | None:
         """Creates the entity in the database, retrieves its 'rendered' then rolls it back"""
         with simulate_entity(sess, self, dependencies) as sess:
             # Drop self
@@ -104,11 +95,11 @@ class ReplaceableEntity:
                 sess.execute(stmt)
 
             # collect all remaining entities
-            db_entities: List[T] = sorted(self.from_database(sess, schema=self.schema), key=lambda x: x.identity)
+            db_entities: list[T] = sorted(self.from_database(sess, schema=self.schema), key=lambda x: x.identity)
 
         with simulate_entity(sess, self, dependencies) as sess:
             # collect all remaining entities
-            all_w_self: List[T] = sorted(self.from_database(sess, schema=self.schema), key=lambda x: x.identity)
+            all_w_self: list[T] = sorted(self.from_database(sess, schema=self.schema), key=lambda x: x.identity)
 
         # Find "self" by diffing the before and after
         for without_self, with_self in zip_longest(db_entities, all_w_self):
@@ -151,14 +142,12 @@ class ReplaceableEntity:
         object_name = self.signature.split("(")[0].strip().lower().replace("-", "_")
         return f"{schema_name}_{object_name}"
 
-    _version_to_replace: Optional[T] = None  # type: ignore
+    _version_to_replace: T | None = None  # type: ignore
 
-    def get_required_migration_op(
-        self: T, sess: Session, dependencies: Optional[List["ReplaceableEntity"]] = None
-    ) -> Optional[ReversibleOp]:
+    def get_required_migration_op(self: T, sess: Session, dependencies: list["ReplaceableEntity"] | None = None) -> ReversibleOp | None:
         """Get the migration operation required for autogenerate"""
         # All entities in the database for self's schema
-        entities_in_database: List[T] = self.from_database(sess, schema=self.schema)
+        entities_in_database: list[T] = self.from_database(sess, schema=self.schema)
 
         db_def = self.get_database_definition(sess, dependencies=dependencies)
 
@@ -180,10 +169,10 @@ class ReplaceableEntity:
 
 class ReplaceableEntityRegistry:
     def __init__(self):
-        self._entities: Dict[str, ReplaceableEntity] = {}
-        self.schemas: Set[str] = set()
-        self.exclude_schemas: Set[str] = set()
-        self.entity_types: Set[Type[ReplaceableEntity]] = set()
+        self._entities: dict[str, ReplaceableEntity] = {}
+        self.schemas: set[str] = set()
+        self.exclude_schemas: set[str] = set()
+        self.entity_types: set[type[ReplaceableEntity]] = set()
 
     def clear(self):
         self._entities.clear()
@@ -194,9 +183,9 @@ class ReplaceableEntityRegistry:
     def register(
         self,
         entities: Iterable[ReplaceableEntity],
-        schemas: Optional[List[str]] = None,
-        exclude_schemas: Optional[Iterable[str]] = None,
-        entity_types: Optional[Iterable[Type[ReplaceableEntity]]] = None,
+        schemas: list[str] | None = None,
+        exclude_schemas: Iterable[str] | None = None,
+        entity_types: Iterable[type[ReplaceableEntity]] | None = None,
     ) -> None:
         self._entities.update({e.identity: e for e in entities})
 
@@ -210,12 +199,12 @@ class ReplaceableEntityRegistry:
             self.entity_types |= set(entity_types)
 
     @property
-    def allowed_entity_types(self) -> Set[Type[ReplaceableEntity]]:
+    def allowed_entity_types(self) -> set[type[ReplaceableEntity]]:
         if self.entity_types:
             return self.entity_types
         return set(collect_subclasses(alembic_utils_extended, ReplaceableEntity))
 
-    def entities(self) -> List[ReplaceableEntity]:
+    def entities(self) -> list[ReplaceableEntity]:
         return list(self._entities.values())
 
 
@@ -229,24 +218,24 @@ registry = ReplaceableEntityRegistry()
 
 def register_entities(
     entities: Iterable[ReplaceableEntity],
-    schemas: Optional[List[str]] = None,
-    exclude_schemas: Optional[Iterable[str]] = None,
-    entity_types: Optional[Iterable[Type[ReplaceableEntity]]] = None,
+    schemas: list[str] | None = None,
+    exclude_schemas: Iterable[str] | None = None,
+    entity_types: Iterable[type[ReplaceableEntity]] | None = None,
 ) -> None:
     """Register entities to be monitored for changes when alembic is invoked with `revision --autogenerate`.
 
     **Parameters:**
 
-    * **entities** - *List[ReplaceableEntity]*: A list of entities (PGFunction, PGView, etc) to monitor for revisions
+    * **entities** - *list[ReplaceableEntity]*: A list of entities (PGFunction, PGView, etc) to monitor for revisions
 
     **Deprecated Parameters:**
 
     *Configure schema and object inclusion/exclusion with `include_name` and `include_object` in `env.py`. For more information see https://alembic.sqlalchemy.org/en/latest/autogenerate.html#controlling-what-to-be-autogenerated*
 
 
-    * **schemas** - *Optional[List[str]]*: A list of SQL schema names to monitor. Note, schemas referenced in registered entities are automatically monitored.
-    * **exclude_schemas** - *Optional[List[str]]*: A list of SQL schemas to ignore. Note, explicitly registered entities will still be monitored.
-    * **entity_types** - *Optional[List[Type[ReplaceableEntity]]]*: A list of ReplaceableEntity classes to consider during migrations. Other entity types are ignored
+    * **schemas** - *list[str] | None*: A list of SQL schema names to monitor. Note, schemas referenced in registered entities are automatically monitored.
+    * **exclude_schemas** - *list[str] | None*: A list of SQL schemas to ignore. Note, explicitly registered entities will still be monitored.
+    * **entity_types** - *list[type[ReplaceableEntity]] | None*: A list of ReplaceableEntity classes to consider during migrations. Other entity types are ignored
     """
     registry.register(entities, schemas, exclude_schemas, entity_types)
 
@@ -255,7 +244,7 @@ def register_entities(
 def compare_registered_entities(
     autogen_context: AutogenContext,
     upgrade_ops,
-    schemas: List[Optional[str]],
+    schemas: list[str | None],
 ):
     connection = autogen_context.connection
 
@@ -267,13 +256,13 @@ def compare_registered_entities(
     include_schemas: bool = autogen_context.opts["include_schemas"]
 
     reflected_schemas = set(autogen_context.inspector.get_schema_names() if include_schemas else [])  # type: ignore
-    sqla_schemas: Set[Optional[str]] = set(schemas)
+    sqla_schemas: set[str | None] = set(schemas)
     manual_schemas = set(registry.schemas or set())  # Deprecated for remove in 0.6.0
     entity_schemas = {x.schema for x in entities}  # from ReplaceableEntity instances
     all_schema_references = reflected_schemas | sqla_schemas | manual_schemas | entity_schemas  # type: ignore
 
     # Remove excluded schemas
-    observed_schemas: Set[str] = {
+    observed_schemas: set[str] = {
         schema_name
         for schema_name in all_schema_references
         if (
@@ -286,12 +275,12 @@ def compare_registered_entities(
     transaction = connection.begin_nested()
     sess = Session(bind=connection)
     try:
-        ordered_entities: List[ReplaceableEntity] = solve_resolution_order(sess, entities)
+        ordered_entities: list[ReplaceableEntity] = solve_resolution_order(sess, entities)
     finally:
         sess.rollback()
 
     # entities that are receiving a create or update op
-    has_create_or_update_op: List[ReplaceableEntity] = []
+    has_create_or_update_op: list[ReplaceableEntity] = []
 
     # database rendered definitions for the entities we have a local instance for
     # Note: used for drops
@@ -372,7 +361,7 @@ def compare_registered_entities(
             # Entities within the schemas that are live
             for schema in observed_schemas:
 
-                db_entities: List[ReplaceableEntity] = entity_class.from_database(sess, schema=schema)
+                db_entities: list[ReplaceableEntity] = entity_class.from_database(sess, schema=schema)
 
                 # Check for functions that were deleted locally
                 for db_entity in db_entities:

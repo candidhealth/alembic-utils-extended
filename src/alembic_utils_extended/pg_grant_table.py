@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from enum import Enum
-from typing import Generator, List, Optional, Union
+from typing import Generator
 
 from flupy import flu
 from sqlalchemy import text as sql_text
@@ -59,15 +59,15 @@ class PGGrantTable(ReplaceableEntity):
 
     * **schema** - *str*: A SQL schema name
     * **table** - *str*: The table to grant access to
-    * **columns** - *List[str]*: A list of column names on *table* to grant access to
+    * **columns** - *list[str]*: A list of column names on *table* to grant access to
     * **role** - *str*: The role to grant access to
-    * **grant** - *Union[Grant, str]*: On of SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER
+    * **grant** - *Grant | str*: On of SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER
     * **with_grant_option** - *bool*: Can the role grant access to other roles
     """
 
     schema: str
     table: str
-    columns: List[str]
+    columns: list[str]
     role: str
     grant: PGGrantTableChoice
     with_grant_option: bool
@@ -79,13 +79,13 @@ class PGGrantTable(ReplaceableEntity):
         schema: str,
         table: str,
         role: str,
-        grant: Union[PGGrantTableChoice, str],
-        columns: Optional[List[str]] = None,
+        grant: PGGrantTableChoice | str,
+        columns: list[str] | None = None,
         with_grant_option=False,
     ):
         self.schema: str = coerce_to_unquoted(schema)
         self.table: str = coerce_to_unquoted(table)
-        self.columns: List[str] = sorted(columns) if columns else []
+        self.columns: list[str] = sorted(columns) if columns else []
         self.role: str = coerce_to_unquoted(role)
         self.grant: PGGrantTableChoice = PGGrantTableChoice(grant)
         self.with_grant_option: bool = with_grant_option

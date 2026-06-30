@@ -1,5 +1,5 @@
 # pylint: disable=unused-argument,invalid-name,line-too-long
-from typing import Generator, List
+from typing import Generator
 
 from parse import parse
 from sqlalchemy import text as sql_text
@@ -81,7 +81,7 @@ class PGFunction(ReplaceableEntity):
             parameters_str = ""
 
         # NOTE: Will fail if a text field has a default and that deafult contains a comma...
-        parameters: List[str] = parameters_str.split(",")
+        parameters: list[str] = parameters_str.split(",")
         parameters = [x[: len(x.lower().split("default")[0])] for x in parameters]
         parameters = [x.strip() for x in parameters]
         drop_params = ", ".join(parameters)

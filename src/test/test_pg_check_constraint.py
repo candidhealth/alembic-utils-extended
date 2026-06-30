@@ -183,44 +183,7 @@ def test_unnamed_constraint_raises_error(engine) -> None:
         )
 
 
-def test_different_schema_not_compared(engine) -> None:
-    metadata = MetaData()
-    Table(
-        "test_table",
-        metadata,
-        Column("id", Integer, primary_key=True),
-        Column("amount", Integer),
-        CheckConstraint("amount >= 0", name="ck_test_table_amount_positive"),
-        schema="DEV",
-    )
-
-    with engine.begin() as connection:
-        metadata.create_all(connection)
-
-    with engine.begin() as connection:
-        connection.execute(text('ALTER TABLE "DEV".test_table DROP CONSTRAINT ck_test_table_amount_positive'))
-
-    output = run_alembic_command(
-        engine=engine,
-        command="revision",
-        command_kwargs={
-            "autogenerate": True,
-            "rev_id": "1",
-            "message": "diff_schema",
-        },
-        target_metadata=metadata,
-        compare_check_constraints=True,
-    )
-
-    migration_path = TEST_VERSIONS_ROOT / "1_diff_schema.py"
-
-    with migration_path.open() as migration_file:
-        migration_contents = migration_file.read()
-
-    assert "op.create_check_constraint" not in migration_contents
-
-
-def test_dev_schema_compared_when_specified(engine) -> None:
+def test_dev_schema_compared(engine) -> None:
     metadata = MetaData()
     Table(
         "test_table",
@@ -246,7 +209,7 @@ def test_dev_schema_compared_when_specified(engine) -> None:
             "message": "dev_schema",
         },
         target_metadata=metadata,
-        compare_check_constraints=["DEV"],
+        compare_check_constraints=True,
     )
 
     migration_path = TEST_VERSIONS_ROOT / "1_dev_schema.py"

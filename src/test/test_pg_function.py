@@ -1,5 +1,3 @@
-from typing import List
-
 from sqlalchemy import text
 
 from alembic_utils_extended.pg_function import PGFunction
@@ -21,7 +19,7 @@ TO_UPPER = PGFunction(
 
 
 def test_trailing_whitespace_stripped():
-    sql_statements: List[str] = [
+    sql_statements: list[str] = [
         str(next(iter(TO_UPPER.to_sql_statement_create()))),
         str(next(iter(TO_UPPER.to_sql_statement_create_or_replace()))),
         str(next(iter(TO_UPPER.to_sql_statement_drop()))),

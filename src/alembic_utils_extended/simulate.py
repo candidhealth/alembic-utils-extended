@@ -2,7 +2,7 @@
 import copy
 import logging
 from contextlib import ExitStack, contextmanager
-from typing import TYPE_CHECKING, List, Optional
+from typing import TYPE_CHECKING
 
 from sqlalchemy.orm import Session
 
@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 def simulate_entity(
     sess: Session,
     entity: "ReplaceableEntity",
-    dependencies: Optional[List["ReplaceableEntity"]] = None,
+    dependencies: list["ReplaceableEntity"] | None = None,
 ):
     """Creates *entiity* in a transaction so postgres rendered definition
     can be retrieved
@@ -30,7 +30,7 @@ def simulate_entity(
         entity = copy.deepcopy(entity)
         entity.with_data = False
 
-    deps: List["ReplaceableEntity"] = dependencies or []
+    deps: list["ReplaceableEntity"] = dependencies or []
 
     outer_transaction = sess.begin_nested()
     try:

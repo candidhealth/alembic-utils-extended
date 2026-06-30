@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, Tuple, Type
+from typing import TYPE_CHECKING, Any
 
 from alembic.autogenerate import renderers
 from alembic.operations import MigrateOperation, Operations
@@ -27,12 +27,12 @@ class ReversibleOp(MigrateOperation):
         self.target = target
 
     @classmethod
-    def invoke_for_target(cls: Type[SupportsTarget], operations, target: "ReplaceableEntity"):
+    def invoke_for_target(cls: type[SupportsTarget], operations, target: "ReplaceableEntity"):
         op = cls(target)
         return operations.invoke(op)
 
     @classmethod
-    def invoke_for_target_optional_cascade(cls: Type[SupportsTargetCascade], operations, target: "ReplaceableEntity", cascade=False):
+    def invoke_for_target_optional_cascade(cls: type[SupportsTargetCascade], operations, target: "ReplaceableEntity", cascade=False):
         op = cls(target, cascade=cascade)  # pylint: disable=unexpected-keyword-arg
         return operations.invoke(op)
 
@@ -50,7 +50,7 @@ class CreateOp(ReversibleOp):
     def reverse(self):
         return DropOp(self.target)
 
-    def to_diff_tuple(self) -> Tuple[Any, ...]:
+    def to_diff_tuple(self) -> tuple[Any, ...]:
         return (
             "create_entity",
             self.target.identity,
@@ -67,7 +67,7 @@ class DropOp(ReversibleOp):
     def reverse(self):
         return CreateOp(self.target)
 
-    def to_diff_tuple(self) -> Tuple[Any, ...]:
+    def to_diff_tuple(self) -> tuple[Any, ...]:
         return "drop_entity", self.target.identity
 
 
@@ -76,7 +76,7 @@ class ReplaceOp(ReversibleOp):
     def reverse(self):
         return RevertOp(self.target)
 
-    def to_diff_tuple(self) -> Tuple[Any, ...]:
+    def to_diff_tuple(self) -> tuple[Any, ...]:
         return (
             "replace_or_revert_entity",
             self.target.identity,
@@ -87,7 +87,7 @@ class ReplaceOp(ReversibleOp):
 class RevertOp(ReversibleOp):
     # Revert is never in an upgrade, so no need to implement reverse
 
-    def to_diff_tuple(self) -> Tuple[Any, ...]:
+    def to_diff_tuple(self) -> tuple[Any, ...]:
         return (
             "replace_or_revert_entity",
             self.target.identity,
