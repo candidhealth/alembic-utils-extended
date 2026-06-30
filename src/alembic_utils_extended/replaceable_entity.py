@@ -2,11 +2,7 @@
 import logging
 from itertools import zip_longest
 from pathlib import Path
-from typing import (
-    Generator,
-    Iterable,
-    TypeVar,
-)
+from typing import Generator, Iterable, TypeVar
 
 from alembic.autogenerate import comparators
 from alembic.autogenerate.api import AutogenContext
@@ -148,9 +144,7 @@ class ReplaceableEntity:
 
     _version_to_replace: T | None = None  # type: ignore
 
-    def get_required_migration_op(
-        self: T, sess: Session, dependencies: list["ReplaceableEntity"] | None = None
-    ) -> ReversibleOp | None:
+    def get_required_migration_op(self: T, sess: Session, dependencies: list["ReplaceableEntity"] | None = None) -> ReversibleOp | None:
         """Get the migration operation required for autogenerate"""
         # All entities in the database for self's schema
         entities_in_database: list[T] = self.from_database(sess, schema=self.schema)

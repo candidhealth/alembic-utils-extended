@@ -116,7 +116,9 @@ def _is_expression_index(index: Index) -> bool:
     return False
 
 
-def _get_model_expression_indexes(metadata, schema: str | None, autogen_context: AutogenContext | None = None) -> list[_ExpressionIndexInfo]:
+def _get_model_expression_indexes(
+    metadata, schema: str | None, autogen_context: AutogenContext | None = None
+) -> list[_ExpressionIndexInfo]:
     indexes: list[_ExpressionIndexInfo] = []
 
     for table in metadata.tables.values():
