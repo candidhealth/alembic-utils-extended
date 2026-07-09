@@ -1,43 +1,88 @@
 from __future__ import annotations
 
+import hashlib
 import logging
+import re
 from typing import TypedDict
 
 from alembic.autogenerate import comparators
 from alembic.autogenerate.api import AutogenContext
 from alembic.operations import ops
-from sqlalchemy import Column, Index, text
+from sqlalchemy import Column, text
 from sqlalchemy.engine.reflection import Inspector
-from sqlalchemy.exc import NoSuchTableError
 from sqlalchemy.sql import visitors
 from sqlalchemy.sql.elements import BindParameter, TextClause
 
 logger = logging.getLogger(__name__)
 
+# PostgreSQL's default NAMEDATALEN is 64, giving a usable identifier limit of
+# 63 characters. SQLAlchemy applies a hash-based truncation to any identifier
+# it treats as a ``_truncated_label`` (which includes indexes generated from
+# ``Column(index=True)`` and names wrapped in ``op.f(...)``): the CREATE INDEX
+# statement it sends to PG uses ``name[:max_-8] + "_" + md5(name)[-4:]`` — a
+# 55-char prefix + 4-char hash for the default 63-limit dialect. PG stores
+# whatever SA sent verbatim, so ``pg_index.relname`` for these indexes is the
+# hashed form. Model-side names come from Python and are the full untruncated
+# string; normalizing both sides through this function gives a stable key for
+# identity-only diff.
+#
+# See ``IdentifierPreparer._truncate_and_render_maxlen_name`` in
+# ``sqlalchemy/sql/compiler.py`` for the source.
+_PG_MAX_IDENTIFIER_LENGTH = 63
 
-class _ExpressionIndexKw(TypedDict, total=False):
+
+def _truncate_identifier(name: str) -> str:
+    if len(name) <= _PG_MAX_IDENTIFIER_LENGTH:
+        return name
+    return name[: _PG_MAX_IDENTIFIER_LENGTH - 8] + "_" + hashlib.md5(name.encode()).hexdigest()[-4:]
+
+
+class _IndexKw(TypedDict, total=False):
     postgresql_using: str
     postgresql_ops: dict[str, str]
     postgresql_where: str
     postgresql_include: list[str]
 
 
-class _ExpressionIndexInfo(TypedDict):
+class _IndexInfo(TypedDict):
     table_name: str
     name: str
     columns: list[str | TextClause]
     expressions: list[str]
     unique: bool
-    kw: _ExpressionIndexKw
+    kw: _IndexKw
 
 
 @comparators.dispatch_for("schema")
-def compare_expression_indexes(
+def compare_indexes(
     autogen_context: AutogenContext,
     upgrade_ops: ops.UpgradeOps,
     _schemas: list[str | None],
 ) -> None:
-    if not autogen_context.opts.get("compare_expression_indexes"):
+    """Autogen index diff on identity ``(table_name, index_name)`` only.
+
+    Owns autogen for ALL user-declared indexes when ``compare_indexes=True``
+    is set. Stock Alembic's index dispatcher is buggy or absent on
+    SQLAlchemy 1.4 across many shapes — function expressions, directional
+    modifiers, ``postgresql_ops`` hacks, opclasses — so this comparator
+    takes the whole namespace and diffs by name.
+
+    Consumers should register an ``include_object`` filter in their
+    ``env.py`` returning ``False`` for ``type_ == "index"`` to prevent
+    stock Alembic from dueling on the same indexes. Indexes backing PK /
+    UNIQUE constraints are excluded automatically (they're managed by
+    stock Alembic's constraint diff, not the index diff).
+
+    Optional ``compare_indexes_include(table_name, index_name, reflected)``
+    callback can be set in ``config.attributes`` to exclude specific
+    indexes from the fork's scope (e.g., sqlalchemy-continuum's ``_version``
+    tables whose indexes are managed by continuum, not the app schema).
+
+    Content changes are not detected. To evolve an index's columns,
+    WHERE clause, INCLUDE list, opclass, or method, rename it — that
+    produces a drop + create pair the comparator will emit.
+    """
+    if not autogen_context.opts.get("compare_indexes"):
         return
 
     inspector: Inspector = autogen_context.inspector
@@ -46,31 +91,43 @@ def compare_expression_indexes(
     if target_metadata is None:
         return
 
+    include_index = autogen_context.opts.get("compare_indexes_include") or (lambda *args, **kw: True)
+
     observed_schemas: set[str | None] = {table.schema for table in target_metadata.tables.values()}
 
     for schema_to_use in observed_schemas:
 
-        model_indexes = _get_model_expression_indexes(target_metadata, schema_to_use, autogen_context)
-        db_indexes = _get_database_expression_indexes(inspector, target_metadata, schema_to_use)
+        model_indexes = [
+            idx
+            for idx in _get_model_indexes(target_metadata, schema_to_use, autogen_context)
+            if include_index(idx["table_name"], idx["name"], False)
+        ]
+        db_indexes = [
+            idx
+            for idx in _get_database_indexes(inspector, target_metadata, schema_to_use)
+            if include_index(idx["table_name"], idx["name"], True)
+        ]
 
-        model_index_names = {(idx["table_name"], idx["name"]) for idx in model_indexes}
-        db_index_names = {(idx["table_name"], idx["name"]) for idx in db_indexes}
+        # Match on the PG-truncated name (identifiers over ``NAMEDATALEN - 1 =
+        # 63`` are silently truncated at CREATE time). Model-side names come
+        # from Python and may exceed the limit; DB-side names are already
+        # truncated by PG. Normalize both to the same key so identity match
+        # actually matches.
+        def _key(idx):
+            return (idx["table_name"], _truncate_identifier(idx["name"]))
 
-        indexes_to_create = model_index_names - db_index_names
-        indexes_to_drop = db_index_names - model_index_names
+        model_keys = {_key(idx) for idx in model_indexes}
+        db_keys = {_key(idx) for idx in db_indexes}
 
-        shared_indexes = model_index_names & db_index_names
-        if shared_indexes:
-            formatted = ", ".join(f"{table}.{name}" for table, name in sorted(shared_indexes))
-            raise RuntimeError(
-                f"Expression index(es) exist in both model and database: {formatted}. "
-                f"alembic-utils-extended cannot diff expression-index contents. "
-                f"To change an expression index, rename it (which produces a drop + create) "
-                f"or write a manual migration."
-            )
+        create_keys = model_keys - db_keys
+        drop_keys = db_keys - model_keys
 
-        for table_name, index_name in indexes_to_create:
-            index_info = next(idx for idx in model_indexes if idx["table_name"] == table_name and idx["name"] == index_name)
+        # Indexes present in both are assumed unchanged (identity-only diff).
+
+        for key in create_keys:
+            index_info = next(idx for idx in model_indexes if _key(idx) == key)
+            table_name = index_info["table_name"]
+            index_name = index_info["name"]
             logger.info(
                 "Detected CreateIndexOp for %s.%s",
                 table_name,
@@ -86,8 +143,10 @@ def compare_expression_indexes(
             )
             upgrade_ops.ops.append(create_op)
 
-        for table_name, index_name in indexes_to_drop:
-            index_info = next(idx for idx in db_indexes if idx["table_name"] == table_name and idx["name"] == index_name)
+        for key in drop_keys:
+            index_info = next(idx for idx in db_indexes if _key(idx) == key)
+            table_name = index_info["table_name"]
+            index_name = index_info["name"]
             logger.info(
                 "Detected DropIndexOp for %s.%s",
                 table_name,
@@ -99,6 +158,7 @@ def compare_expression_indexes(
                 columns=index_info["columns"],
                 schema=schema_to_use,
                 unique=index_info.get("unique", False),
+                **index_info.get("kw", {}),
             )
             drop_op = ops.DropIndexOp(
                 index_name=index_name,
@@ -109,31 +169,24 @@ def compare_expression_indexes(
             upgrade_ops.ops.append(drop_op)
 
 
-def _is_expression_index(index: Index) -> bool:
-    for expr in index.expressions:
-        if not isinstance(expr, Column):
-            return True
-    return False
+def _get_model_indexes(metadata, schema: str | None, autogen_context: AutogenContext | None = None) -> list[_IndexInfo]:
+    """Extract every user-declared :class:`Index` from ``metadata`` for the
+    given schema.
 
-
-def _get_model_expression_indexes(
-    metadata, schema: str | None, autogen_context: AutogenContext | None = None
-) -> list[_ExpressionIndexInfo]:
-    indexes: list[_ExpressionIndexInfo] = []
+    ``table.indexes`` on a SQLAlchemy :class:`Table` only contains indexes
+    declared via ``Index(...)``; the implicit indexes backing PRIMARY KEY
+    and UNIQUE constraints are managed separately by stock Alembic's
+    constraint diff, so this iteration naturally excludes them.
+    """
+    indexes: list[_IndexInfo] = []
 
     for table in metadata.tables.values():
         if table.schema != schema:
             continue
 
         for index in table.indexes:
-            if not _is_expression_index(index):
-                continue
-
             if index.name is None:
-                raise ValueError(
-                    f"Unnamed expression index on table '{table.name}'. "
-                    f"All expression indexes must have a name for autogenerate support."
-                )
+                raise ValueError(f"Unnamed index on table '{table.name}'. " f"All indexes must have a name for autogenerate support.")
 
             columns = []
             expressions_list = []
@@ -147,7 +200,7 @@ def _get_model_expression_indexes(
                     columns.append(text(expr_str))
                     expressions_list.append(expr_str)
 
-            kw: _ExpressionIndexKw = {}
+            kw: _IndexKw = {}
             if hasattr(index, "dialect_options") and "postgresql" in index.dialect_options:
                 pg_opts = index.dialect_options["postgresql"]
                 if pg_opts.get("using"):
@@ -174,11 +227,11 @@ def _get_model_expression_indexes(
 
 
 def _raise_if_string_arg_matches_column_name(expr, table, index_name: str) -> None:
-    """Catch the `func.X("column_name_str")` anti-pattern.
+    """Catch the ``func.X("column_name_str")`` anti-pattern.
 
-    SQLAlchemy treats bare strings inside `func.X(...)` as bound-parameter LITERAL
-    VALUES, not column references — `func.lower("payer_name")` compiles to
-    `lower(:literal_1)` with the value `'payer_name'`, NOT to `lower(payer_name)`.
+    SQLAlchemy treats bare strings inside ``func.X(...)`` as bound-parameter LITERAL
+    VALUES, not column references — ``func.lower("payer_name")`` compiles to
+    ``lower(:literal_1)`` with the value ``'payer_name'``, NOT to ``lower(payer_name)``.
     The resulting index is on the constant string and useless. Catch it at autogen
     time by walking the expression tree for BindParameter values whose strings
     match a column name on the index's table — that combination is almost always
@@ -188,7 +241,7 @@ def _raise_if_string_arg_matches_column_name(expr, table, index_name: str) -> No
     for elem in visitors.iterate(expr):
         if isinstance(elem, BindParameter) and isinstance(elem.value, str) and elem.value in column_names:
             raise ValueError(
-                f"Expression index {index_name!r} on table {table.name!r} references a string "
+                f"Index {index_name!r} on table {table.name!r} references a string "
                 f"literal {elem.value!r} that matches a column on the same table. This is the "
                 f"`func.X({elem.value!r})` anti-pattern — the string is being bound as a parameter "
                 f"value, not a column reference, so the index is on the constant string. Use "
@@ -199,75 +252,130 @@ def _raise_if_string_arg_matches_column_name(expr, table, index_name: str) -> No
 def _render_index_expression(expr, autogen_context: AutogenContext | None) -> str:
     """Render a SQLAlchemy expression as a SQL string suitable for CREATE INDEX.
 
-    Delegates to Alembic's `render_ddl_sql_expr`, which supplies the right compile
-    flags (`literal_binds=True`, `include_table=False`) and the postgres-dialect-aware
-    handling of index expression self-grouping. Falls back to a plain `str(expr)` only
+    Delegates to Alembic's ``render_ddl_sql_expr``, which supplies the right compile
+    flags (``literal_binds=True``, ``include_table=False``) and the postgres-dialect-aware
+    handling of index expression self-grouping. Falls back to a plain ``str(expr)`` only
     when no autogen_context is supplied (test paths exercising the predicate alone)."""
     if autogen_context is None or not hasattr(expr, "compile"):
         return str(expr)
     return autogen_context.migration_context.impl.render_ddl_sql_expr(expr, is_index=True)
 
 
-def _get_database_expression_indexes(
+def _parse_indexdef(indexdef: str) -> tuple[list[TextClause], _IndexKw]:
+    """Parse a ``pg_get_indexdef`` output into ``(columns, kwargs)`` suitable
+    for reconstructing a :class:`CreateIndexOp` on downgrade.
+
+    ``pg_get_indexdef`` shape:
+        ``CREATE [UNIQUE] INDEX name ON [schema.]table USING method (cols) [INCLUDE (...)] [WHERE ...]``
+
+    Column-list splitting is depth-aware so expressions with commas (e.g.
+    ``coalesce(a, b)``) survive intact.
+    """
+    kwargs: _IndexKw = {}
+
+    method_match = re.search(r"USING\s+(\w+)\s+\(", indexdef, re.IGNORECASE)
+    if method_match is None:
+        return ([text(indexdef)], kwargs)
+    kwargs["postgresql_using"] = method_match.group(1)
+
+    # Walk from just past the opening paren to find its matching close.
+    start = method_match.end()
+    depth = 1
+    i = start
+    while i < len(indexdef) and depth > 0:
+        char = indexdef[i]
+        if char == "(":
+            depth += 1
+        elif char == ")":
+            depth -= 1
+        i += 1
+    col_list_str = indexdef[start : i - 1]
+    tail = indexdef[i:]
+
+    # Split the column list on top-level commas only.
+    columns: list[TextClause] = []
+    buf = ""
+    depth = 0
+    for char in col_list_str:
+        if char == "(":
+            depth += 1
+            buf += char
+        elif char == ")":
+            depth -= 1
+            buf += char
+        elif char == "," and depth == 0:
+            columns.append(text(buf.strip()))
+            buf = ""
+        else:
+            buf += char
+    if buf.strip():
+        columns.append(text(buf.strip()))
+
+    include_match = re.search(r"INCLUDE\s+\(([^)]+)\)", tail, re.IGNORECASE)
+    if include_match:
+        kwargs["postgresql_include"] = [c.strip() for c in include_match.group(1).split(",")]
+
+    where_match = re.search(r"WHERE\s+(.+)$", tail.strip(), re.IGNORECASE | re.DOTALL)
+    if where_match:
+        kwargs["postgresql_where"] = where_match.group(1).strip()
+
+    return (columns, kwargs)
+
+
+def _get_database_indexes(
     inspector: Inspector,
     metadata,
     schema: str | None,
-) -> list[_ExpressionIndexInfo]:
-    indexes: list[_ExpressionIndexInfo] = []
+) -> list[_IndexInfo]:
+    """Read every user-declared index in the target schema directly from
+    ``pg_index``.
 
-    for table in metadata.tables.values():
-        if table.schema != schema:
-            continue
+    Bypasses :meth:`Inspector.get_indexes` because SQLAlchemy 1.4's
+    reflector silently skips function-expression indexes on PostgreSQL
+    (emits ``SAWarning: Skipped unsupported reflection ...``). Querying
+    ``pg_index`` directly captures everything uniformly.
 
-        try:
-            db_indexes = inspector.get_indexes(table.name, schema=schema)
-        except NotImplementedError:
-            logger.warning("Database dialect does not support get_indexes. " "Expression index autogenerate is not available.")
-            return []
-        except NoSuchTableError:
-            continue
+    Excludes indexes backing PRIMARY KEY and UNIQUE constraints
+    (identified via ``pg_constraint.conindid``) — those are managed by
+    stock Alembic's constraint diff, not the index diff.
+    """
+    table_names = [t.name for t in metadata.tables.values() if t.schema == schema]
+    if not table_names:
+        return []
 
-        for idx in db_indexes:
-            if idx.get("name") is None:
-                continue
+    query = text(
+        """
+        SELECT
+            c.relname AS index_name,
+            t.relname AS table_name,
+            pg_get_indexdef(i.indexrelid) AS index_definition,
+            i.indisunique AS is_unique
+        FROM pg_index i
+        JOIN pg_class c ON c.oid = i.indexrelid
+        JOIN pg_class t ON t.oid = i.indrelid
+        JOIN pg_namespace n ON n.oid = c.relnamespace
+        LEFT JOIN pg_constraint con ON con.conindid = i.indexrelid
+        WHERE n.nspname = :schema
+          AND t.relname = ANY(:table_names)
+          AND con.oid IS NULL
+          AND NOT i.indisprimary
+        """
+    )
 
-            expressions = idx.get("expressions")
-            if not expressions:
-                continue
+    resolved_schema = schema or "public"
+    rows = inspector.bind.execute(query, {"schema": resolved_schema, "table_names": table_names}).fetchall()
 
-            column_names = idx.get("column_names", [])
-            has_expression = False
-            for i, expr in enumerate(expressions):
-                if i < len(column_names) and column_names[i] is None:
-                    has_expression = True
-                    break
-                elif expr is not None and (i >= len(column_names) or column_names[i] != expr):
-                    has_expression = True
-                    break
-
-            if not has_expression:
-                continue
-
-            columns = []
-            expressions_list = []
-            for i, expr in enumerate(expressions):
-                if i < len(column_names) and column_names[i] is not None:
-                    columns.append(column_names[i])
-                    expressions_list.append(column_names[i])
-                else:
-                    expr_str = str(expr)
-                    columns.append(text(expr_str))
-                    expressions_list.append(expr_str)
-
-            indexes.append(
-                {
-                    "table_name": table.name,
-                    "name": idx["name"],
-                    "columns": columns,
-                    "expressions": expressions_list,
-                    "unique": idx.get("unique", False),
-                    "kw": {},
-                }
-            )
-
+    indexes: list[_IndexInfo] = []
+    for row in rows:
+        columns, kw = _parse_indexdef(row.index_definition)
+        indexes.append(
+            {
+                "table_name": row.table_name,
+                "name": row.index_name,
+                "columns": columns,
+                "expressions": [str(col) for col in columns],
+                "unique": row.is_unique,
+                "kw": kw,
+            }
+        )
     return indexes
