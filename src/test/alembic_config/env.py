@@ -15,7 +15,7 @@ fileConfig(config.config_file_name)
 
 target_metadata = config.attributes.get("target_metadata", MetaData())
 compare_check_constraints = config.attributes.get("compare_check_constraints", False)
-compare_expression_indexes = config.attributes.get("compare_expression_indexes", False)
+compare_indexes = config.attributes.get("compare_indexes", False)
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:
@@ -65,7 +65,7 @@ def run_migrations_online():
             include_object=include_object,
             include_name=include_name,
             compare_check_constraints=compare_check_constraints,
-            compare_expression_indexes=compare_expression_indexes,
+            compare_indexes=compare_indexes,
         )
 
         with context.begin_transaction():

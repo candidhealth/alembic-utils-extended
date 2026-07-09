@@ -64,26 +64,49 @@ context.configure(
 )
 ```
 
-### Monitor Expression Indexes
+### Monitor Indexes
 
-Alembic's built-in autogenerate silently skips expression indexes (`Index("ix_foo", func.lower(table.c.x))`) because it
-can't reliably reflect functional-index definitions from `pg_indexes`. With `compare_expression_indexes=True`,
-alembic_utils_extended detects new and removed expression indexes by name and emits the corresponding
-`op.create_index` / `op.drop_index`. Expression indexes must be named.
+Alembic's built-in autogenerate on SQLAlchemy 1.4 mishandles several PostgreSQL index shapes — function expressions
+(`func.lower(col)`), directional modifiers (`desc(col)`, `literal_column("col DESC")`), `postgresql_ops` opclass hacks
+for direction, and mixed shapes routinely produce wrong / duplicated diffs.
+
+With `compare_indexes=True`, `alembic_utils_extended` takes over autogen for **all** user-declared indexes, reading the
+DB side directly from `pg_index` and applying an identity-based diff. Consumers must also register an `include_object`
+filter in `env.py` returning `False` for `type_ == "index"` so stock Alembic's index dispatcher doesn't fire and duel
+with the fork. All indexes must be named.
 
 ```python
 # migrations/env.py
 from alembic import context
 
+def include_object(obj, name, type_, reflected, compare_to):
+    # alembic-utils-extended's `compare_indexes` comparator owns all index autogeneration.
+    # Skip stock Alembic's index dispatcher entirely to avoid dueling autogeneration.
+    if type_ == "index":
+        return False
+    return True
+
 context.configure(
     # ... other configurations ...
-    compare_expression_indexes=True,
+    include_object=include_object,
+    compare_indexes=True,
 )
 ```
 
+Indexes backing PRIMARY KEY and UNIQUE constraints are excluded automatically (managed by stock Alembic's constraint
+diff).
+
 **Content changes under a stable name are not detected.** Comparison is identity-only (`(table_name, index_name)` set
-diff). If the same index name exists in both the model and the database, autogenerate raises rather than silently miss
-an expression change — to evolve the expression, rename the index (which produces a drop + create).
+diff). If the same index name exists in both the model and the database, the comparator treats it as unchanged. To
+evolve an index's columns, WHERE clause, opclass, INCLUDE list, or method, rename it (which produces a drop + create
+pair the fork will emit) or write a manual migration. This is a real trade-off vs. stock Alembic, which detects column-
+list changes for plain-column indexes — but stock Alembic's index handling has enough other bugs on SA 1.4 that
+identity-only-plus-rename is easier to reason about than any partial coverage.
+
+**Coverage is best-effort, not guaranteed.** Indexes can drift out of prod (manual `CREATE INDEX`, out-of-band drops)
+in ways autogen against a local DB can never catch. This library closes the most common autogen bugs but does not
+guarantee every declared index actually exists in your database. Audit periodically with a direct `pg_index` query —
+see the auditing recipe below.
 
 **Common pitfalls the comparator catches at autogenerate time:**
 
@@ -91,6 +114,30 @@ an expression change — to evolve the expression, rename the index (which produ
   values, not column references. The resulting index is on the constant string, not the column. Use
   `func.X(table.c.col_name)` or `func.X(literal_column("col_name"))` instead. The comparator raises with a remediation
   hint when it detects this.
+
+### Auditing indexes against production
+
+Run against a prod replica to catch drift the fork can't detect on its own (indexes declared in code but missing from
+prod, or vice versa):
+
+```sql
+-- Lists every user-declared index in prod (excludes PK/UNIQUE constraint indexes).
+-- Cross-reference against your model's declared index set.
+SELECT
+    n.nspname AS schema_name,
+    t.relname AS table_name,
+    c.relname AS index_name,
+    pg_get_indexdef(i.indexrelid) AS index_definition
+FROM pg_index i
+JOIN pg_class     c ON c.oid = i.indexrelid
+JOIN pg_class     t ON t.oid = i.indrelid
+JOIN pg_namespace n ON n.oid = c.relnamespace
+LEFT JOIN pg_constraint con ON con.conindid = i.indexrelid
+WHERE n.nspname = 'public'
+  AND con.oid IS NULL
+  AND NOT i.indisprimary
+ORDER BY t.relname, c.relname;
+```
 
 ### Autogeneration
 

@@ -8,12 +8,13 @@ from sqlalchemy import (
     Table,
     desc,
     func,
+    literal_column,
     text,
 )
 
 from alembic_utils_extended.pg_expression_index import (
-    _get_model_expression_indexes,
-    _is_expression_index,
+    _get_model_indexes,
+    _truncate_identifier,
 )
 from alembic_utils_extended.testbase import (
     TEST_VERSIONS_ROOT,
@@ -46,7 +47,7 @@ def test_detect_create_expression_index(engine) -> None:
             "message": "create_expr_idx",
         },
         target_metadata=metadata,
-        compare_expression_indexes=True,
+        compare_indexes=True,
     )
 
     migration_path = TEST_VERSIONS_ROOT / "1_create_expr_idx.py"
@@ -95,7 +96,7 @@ def test_detect_drop_expression_index(engine) -> None:
             "message": "drop_expr_idx",
         },
         target_metadata=metadata,
-        compare_expression_indexes=True,
+        compare_indexes=True,
     )
 
     migration_path = TEST_VERSIONS_ROOT / "1_drop_expr_idx.py"
@@ -120,7 +121,11 @@ def test_detect_drop_expression_index(engine) -> None:
     )
 
 
-def test_raises_when_expression_index_exists_in_both(engine) -> None:
+def test_skips_when_expression_index_exists_in_both(engine) -> None:
+    """When an expression index exists in both model and DB with the same
+    identity (table, name), the comparator treats it as unchanged and emits
+    neither a create nor a drop. Content changes must be signaled by rename.
+    """
     metadata = MetaData()
     table = Table(
         "test_table",
@@ -133,21 +138,28 @@ def test_raises_when_expression_index_exists_in_both(engine) -> None:
     with engine.begin() as connection:
         metadata.create_all(connection)
 
-    with pytest.raises(RuntimeError, match=r"test_table\.idx_test_table_name_lower"):
-        run_alembic_command(
-            engine=engine,
-            command="revision",
-            command_kwargs={
-                "autogenerate": True,
-                "rev_id": "1",
-                "message": "should_raise",
-            },
-            target_metadata=metadata,
-            compare_expression_indexes=True,
-        )
+    run_alembic_command(
+        engine=engine,
+        command="revision",
+        command_kwargs={
+            "autogenerate": True,
+            "rev_id": "1",
+            "message": "no_op",
+        },
+        target_metadata=metadata,
+        compare_indexes=True,
+    )
+
+    migration_path = TEST_VERSIONS_ROOT / "1_no_op.py"
+    migration_contents = migration_path.read_text()
+
+    assert "op.create_index" not in migration_contents
+    assert "op.drop_index" not in migration_contents
 
 
-def test_raises_lists_every_shared_index(engine) -> None:
+def test_skips_every_shared_expression_index(engine) -> None:
+    """Multiple shared expression indexes are all treated as unchanged; the
+    autogen'd migration is empty."""
     metadata = MetaData()
     table = Table(
         "test_table",
@@ -162,26 +174,28 @@ def test_raises_lists_every_shared_index(engine) -> None:
     with engine.begin() as connection:
         metadata.create_all(connection)
 
-    with pytest.raises(RuntimeError) as exc_info:
-        run_alembic_command(
-            engine=engine,
-            command="revision",
-            command_kwargs={
-                "autogenerate": True,
-                "rev_id": "1",
-                "message": "should_raise_multi",
-            },
-            target_metadata=metadata,
-            compare_expression_indexes=True,
-        )
+    run_alembic_command(
+        engine=engine,
+        command="revision",
+        command_kwargs={
+            "autogenerate": True,
+            "rev_id": "1",
+            "message": "no_op_multi",
+        },
+        target_metadata=metadata,
+        compare_indexes=True,
+    )
 
-    message = str(exc_info.value)
-    assert "test_table.idx_test_table_name_lower" in message
-    assert "test_table.idx_test_table_email_lower" in message
-    assert "rename" in message
+    migration_path = TEST_VERSIONS_ROOT / "1_no_op_multi.py"
+    migration_contents = migration_path.read_text()
+
+    assert "op.create_index" not in migration_contents
+    assert "op.drop_index" not in migration_contents
 
 
-def test_ignore_regular_column_indexes(engine) -> None:
+def test_fork_handles_plain_column_indexes(engine) -> None:
+    """Fork owns all user-declared indexes, including plain-column ones.
+    Model declares idx, DB doesn't have it → fork emits create."""
     metadata = MetaData()
     table = Table(
         "test_table",
@@ -197,24 +211,23 @@ def test_ignore_regular_column_indexes(engine) -> None:
     with engine.begin() as connection:
         connection.execute(text("DROP INDEX IF EXISTS idx_test_table_name"))
 
-    output = run_alembic_command(
+    run_alembic_command(
         engine=engine,
         command="revision",
         command_kwargs={
             "autogenerate": True,
             "rev_id": "1",
-            "message": "ignore_regular",
+            "message": "plain_col_idx",
         },
         target_metadata=metadata,
-        compare_expression_indexes=True,
+        compare_indexes=True,
     )
 
-    migration_path = TEST_VERSIONS_ROOT / "1_ignore_regular.py"
+    migration_path = TEST_VERSIONS_ROOT / "1_plain_col_idx.py"
+    migration_contents = migration_path.read_text()
 
-    with migration_path.open() as migration_file:
-        migration_contents = migration_file.read()
-
-    assert "idx_test_table_name" not in migration_contents or "op.create_index" not in migration_contents
+    assert "op.create_index" in migration_contents
+    assert "idx_test_table_name" in migration_contents
 
 
 def test_disabled_by_default(engine) -> None:
@@ -252,26 +265,10 @@ def test_disabled_by_default(engine) -> None:
     assert "idx_test_table_name_lower" not in migration_contents
 
 
-def test_is_expression_index() -> None:
-    metadata = MetaData()
-    table = Table(
-        "test_table",
-        metadata,
-        Column("id", Integer, primary_key=True),
-        Column("name", String(100)),
-    )
-
-    regular_index = Index("idx_regular", table.c.name)
-    assert _is_expression_index(regular_index) is False
-
-    expr_index = Index("idx_expr", func.lower(table.c.name))
-    assert _is_expression_index(expr_index) is True
-
-    mixed_index = Index("idx_mixed", table.c.id, func.lower(table.c.name))
-    assert _is_expression_index(mixed_index) is True
-
-
-def test_get_model_expression_indexes() -> None:
+def test_get_model_indexes_returns_all_declared_indexes() -> None:
+    """Fork iterates every ``Index()`` decl regardless of shape — plain-
+    column, function-expression, directional. PK/UNIQUE-backed indexes
+    are excluded because they aren't in ``table.indexes``."""
     metadata = MetaData()
     table = Table(
         "test_table",
@@ -281,12 +278,43 @@ def test_get_model_expression_indexes() -> None:
     )
     Index("idx_regular", table.c.name)
     Index("idx_expr", func.lower(table.c.name))
+    Index("idx_desc", desc(table.c.name))
 
-    indexes = _get_model_expression_indexes(metadata, None)
+    indexes = _get_model_indexes(metadata, None)
 
-    assert len(indexes) == 1
-    assert indexes[0]["name"] == "idx_expr"
-    assert indexes[0]["table_name"] == "test_table"
+    assert {idx["name"] for idx in indexes} == {"idx_regular", "idx_expr", "idx_desc"}
+
+
+def test_truncate_identifier_matches_sqlalchemy_hash_form() -> None:
+    """SQLAlchemy hash-truncates any identifier it treats as ``_truncated_label``
+    (which includes indexes generated from ``Column(index=True)`` and names
+    wrapped in ``op.f(...)``) to fit within PG's 63-char limit. The formula is
+    ``name[:55] + "_" + md5(name).hexdigest()[-4:]`` — a 55-char prefix + 4-char
+    hash-suffix for the default 63-limit dialect.
+
+    Under 63 chars the name passes through unchanged. Over 63 chars, the
+    truncated form must match what SA sends in the CREATE INDEX statement,
+    which is what PG stores in ``pg_index`` — otherwise the identity-only
+    diff sees model-side long-name vs DB-side hash-truncated as distinct
+    and re-emits create ops on every autogen run.
+    """
+    # Under 63 chars: pass-through.
+    short = "ix_short_index_name"
+    assert _truncate_identifier(short) == short
+
+    # Exactly 63 chars: pass-through (limit is inclusive).
+    at_limit = "a" * 63
+    assert _truncate_identifier(at_limit) == at_limit
+
+    # Over 63 chars: hash truncation. Concrete case pulled from candid-api's
+    # ``edi999_element_context.component_data_element_position_in_composite``
+    # column, whose autogen'd 70-char index name is what SA hash-truncates
+    # to ``ix_..._positi_c80b``.
+    long_name = "ix_edi999_element_context_component_data_element_position_in_composite"
+    expected = "ix_edi999_element_context_component_data_element_positi_c80b"
+    truncated = _truncate_identifier(long_name)
+    assert truncated == expected
+    assert len(truncated) == 60  # 55-char prefix + "_" + 4-char hash.
 
 
 def test_dev_schema_compared(engine) -> None:
@@ -315,7 +343,7 @@ def test_dev_schema_compared(engine) -> None:
             "message": "dev_schema",
         },
         target_metadata=metadata,
-        compare_expression_indexes=True,
+        compare_indexes=True,
     )
 
     migration_path = TEST_VERSIONS_ROOT / "1_dev_schema.py"
@@ -325,6 +353,77 @@ def test_dev_schema_compared(engine) -> None:
 
     assert "op.create_index" in migration_contents
     assert "idx_test_table_name_lower" in migration_contents
+
+
+def test_detect_gin_with_opclass(engine) -> None:
+    """GIN index with a trigram opclass baked into the expression. The
+    comparator's identity-only diff still detects create/drop by name; verify
+    the emitted op preserves ``postgresql_using='gin'`` and the opclass so the
+    rebuilt index keeps the trigram search capability."""
+    from alembic_utils_extended.pg_extension import PGExtension
+    from alembic_utils_extended.replaceable_entity import register_entities
+
+    # Register the pg_trgm extension so PGExtension autogen doesn't emit a
+    # drop op for it (the extension is required so the CREATE INDEX using
+    # gin_trgm_ops actually applies on upgrade).
+    register_entities([PGExtension(schema="public", signature="pg_trgm")], entity_types=[PGExtension])
+
+    with engine.begin() as connection:
+        connection.execute(text("CREATE EXTENSION IF NOT EXISTS pg_trgm"))
+
+    metadata = MetaData()
+    table = Table(
+        "test_table",
+        metadata,
+        Column("id", Integer, primary_key=True),
+        Column("name", String(100)),
+    )
+    Index(
+        "idx_test_table_name_trgm",
+        table.c.name,
+        postgresql_using="gin",
+        postgresql_ops={"name": "gin_trgm_ops"},
+    )
+
+    with engine.begin() as connection:
+        metadata.create_all(connection)
+
+    with engine.begin() as connection:
+        connection.execute(text("DROP INDEX IF EXISTS idx_test_table_name_trgm"))
+
+    run_alembic_command(
+        engine=engine,
+        command="revision",
+        command_kwargs={
+            "autogenerate": True,
+            "rev_id": "1",
+            "message": "gin_opclass",
+        },
+        target_metadata=metadata,
+        compare_indexes=True,
+    )
+
+    migration_path = TEST_VERSIONS_ROOT / "1_gin_opclass.py"
+    migration_contents = migration_path.read_text()
+
+    assert "op.create_index" in migration_contents
+    assert "idx_test_table_name_trgm" in migration_contents
+    assert "postgresql_using" in migration_contents
+    assert "gin" in migration_contents
+    assert "gin_trgm_ops" in migration_contents
+
+    run_alembic_command(
+        engine=engine,
+        command="upgrade",
+        command_kwargs={"revision": "head"},
+        target_metadata=metadata,
+    )
+    run_alembic_command(
+        engine=engine,
+        command="downgrade",
+        command_kwargs={"revision": "base"},
+        target_metadata=metadata,
+    )
 
 
 def test_detect_partial_expression_index(engine) -> None:
@@ -359,7 +458,7 @@ def test_detect_partial_expression_index(engine) -> None:
             "message": "partial_expr",
         },
         target_metadata=metadata,
-        compare_expression_indexes=True,
+        compare_indexes=True,
     )
 
     migration_path = TEST_VERSIONS_ROOT / "1_partial_expr.py"
@@ -411,7 +510,7 @@ def test_detect_multi_column_expression_index(engine) -> None:
             "message": "multi_col_expr",
         },
         target_metadata=metadata,
-        compare_expression_indexes=True,
+        compare_indexes=True,
     )
 
     migration_path = TEST_VERSIONS_ROOT / "1_multi_col_expr.py"
@@ -468,7 +567,7 @@ def test_detect_rename_emits_drop_and_create(engine) -> None:
             "message": "rename_expr_idx",
         },
         target_metadata=metadata,
-        compare_expression_indexes=True,
+        compare_indexes=True,
     )
 
     migration_path = TEST_VERSIONS_ROOT / "1_rename_expr_idx.py"
@@ -494,10 +593,14 @@ def test_detect_rename_emits_drop_and_create(engine) -> None:
 
 
 def test_detect_desc_expression_renders_without_table_qualifier(engine) -> None:
-    """desc(Column) historically rendered as `tablename.col DESC`, which Postgres
-    rejects inside CREATE INDEX. Verify the rendered expression strips the table
-    qualifier (Alembic's render_ddl_sql_expr supplies include_table=False) and the
-    resulting migration applies cleanly."""
+    """DESC-modified expressions historically rendered as `tablename.col DESC`,
+    which Postgres rejects inside CREATE INDEX. Verify the rendered expression
+    strips the table qualifier (Alembic's render_ddl_sql_expr supplies
+    include_table=False) and the resulting migration applies cleanly.
+
+    Uses desc() around a real function expression so the fork's comparator
+    picks it up — plain desc(Column) is handled by Alembic's stock autogen.
+    """
     metadata = MetaData()
     table = Table(
         "test_table",
@@ -505,13 +608,13 @@ def test_detect_desc_expression_renders_without_table_qualifier(engine) -> None:
         Column("id", Integer, primary_key=True),
         Column("name", String(100)),
     )
-    Index("idx_test_table_id_name_desc", table.c.id, desc(table.c.name))
+    Index("idx_test_table_lower_name_desc", desc(func.lower(table.c.name)))
 
     with engine.begin() as connection:
         metadata.create_all(connection)
 
     with engine.begin() as connection:
-        connection.execute(text("DROP INDEX IF EXISTS idx_test_table_id_name_desc"))
+        connection.execute(text("DROP INDEX IF EXISTS idx_test_table_lower_name_desc"))
 
     run_alembic_command(
         engine=engine,
@@ -522,15 +625,15 @@ def test_detect_desc_expression_renders_without_table_qualifier(engine) -> None:
             "message": "desc_expr",
         },
         target_metadata=metadata,
-        compare_expression_indexes=True,
+        compare_indexes=True,
     )
 
     migration_path = TEST_VERSIONS_ROOT / "1_desc_expr.py"
     migration_contents = migration_path.read_text()
 
     assert "op.create_index" in migration_contents
-    assert "idx_test_table_id_name_desc" in migration_contents
-    # The DESC expression must render as `name DESC`, not `test_table.name DESC`.
+    assert "idx_test_table_lower_name_desc" in migration_contents
+    # The DESC expression must render as `lower(name) DESC`, not `lower(test_table.name) DESC`.
     assert "test_table.name" not in migration_contents
     assert "DESC" in migration_contents
 
@@ -577,7 +680,7 @@ def test_raises_on_func_with_string_arg_matching_column_name(engine) -> None:
                 "message": "should_raise_anti_pattern",
             },
             target_metadata=metadata,
-            compare_expression_indexes=True,
+            compare_indexes=True,
         )
 
 
@@ -611,7 +714,7 @@ def test_allows_legitimate_string_literal_args(engine) -> None:
             "message": "legit_literal",
         },
         target_metadata=metadata,
-        compare_expression_indexes=True,
+        compare_indexes=True,
     )
 
     migration_path = TEST_VERSIONS_ROOT / "1_legit_literal.py"
@@ -654,7 +757,7 @@ def test_detect_postgresql_include_clause_is_preserved(engine) -> None:
             "message": "include_clause",
         },
         target_metadata=metadata,
-        compare_expression_indexes=True,
+        compare_indexes=True,
     )
 
     migration_path = TEST_VERSIONS_ROOT / "1_include_clause.py"
@@ -673,6 +776,85 @@ def test_detect_postgresql_include_clause_is_preserved(engine) -> None:
         command_kwargs={"revision": "head"},
         target_metadata=metadata,
     )
+
+
+# ---------------------------------------------------------------------------
+# Idempotency: autogen must produce a no-op migration on the second run,
+# regardless of index shape. This is the safety net for the identity-only
+# diff — if it drifts, `cdc alembic` keeps emitting the same ops forever.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "index_factory",
+    [
+        # Function expressions.
+        pytest.param(lambda t: Index("ix_t_lower", func.lower(t.c.name)), id="func_lower"),
+        pytest.param(lambda t: Index("ix_t_trim_lower", func.trim(func.lower(t.c.name))), id="nested_func"),
+        # Direction modifiers.
+        pytest.param(lambda t: Index("ix_t_desc", desc(t.c.created_at)), id="desc"),
+        pytest.param(lambda t: Index("ix_t_lit_desc", literal_column("created_at DESC")), id="literal_column_desc"),
+        pytest.param(lambda t: Index("ix_t_lit_nulls_first", literal_column("created_at NULLS FIRST")), id="nulls_first"),
+        # Mixed.
+        pytest.param(lambda t: Index("ix_t_mixed", t.c.id, desc(t.c.created_at)), id="mixed_plain_and_desc"),
+        pytest.param(lambda t: Index("ix_t_mixed_fn", t.c.id, func.lower(t.c.name)), id="mixed_plain_and_func"),
+        # Partial.
+        pytest.param(
+            lambda t: Index("ix_t_partial", func.lower(t.c.name), postgresql_where=text("id > 0")),
+            id="partial_with_expr",
+        ),
+        # GIN with opclass.
+        pytest.param(
+            lambda t: Index("ix_t_gin", text("(name || ' ') gin_trgm_ops"), postgresql_using="gin"),
+            id="gin_with_opclass",
+        ),
+    ],
+)
+def test_autogen_is_idempotent(engine, index_factory) -> None:
+    """After applying the fork-generated migration, a second autogen run
+    must find no diff (empty upgrade / downgrade blocks). Regression guard
+    for the identity-only comparator drifting."""
+    metadata = MetaData()
+    table = Table(
+        "test_table",
+        metadata,
+        Column("id", Integer, primary_key=True),
+        Column("name", String(100)),
+        Column("created_at", String(30)),
+    )
+    index_factory(table)
+
+    with engine.begin() as connection:
+        metadata.create_all(connection)
+
+    # First run: fork emits create ops.
+    run_alembic_command(
+        engine=engine,
+        command="revision",
+        command_kwargs={"autogenerate": True, "rev_id": "1", "message": "first"},
+        target_metadata=metadata,
+        compare_indexes=True,
+    )
+    # Apply the generated migration.
+    run_alembic_command(
+        engine=engine,
+        command="upgrade",
+        command_kwargs={"revision": "head"},
+        target_metadata=metadata,
+    )
+
+    # Second run: nothing should have changed. Migration body must be empty.
+    run_alembic_command(
+        engine=engine,
+        command="revision",
+        command_kwargs={"autogenerate": True, "rev_id": "2", "message": "second"},
+        target_metadata=metadata,
+        compare_indexes=True,
+    )
+
+    second = (TEST_VERSIONS_ROOT / "2_second.py").read_text()
+    assert "op.create_index" not in second, f"Second autogen re-emitted a create:\n{second}"
+    assert "op.drop_index" not in second, f"Second autogen re-emitted a drop:\n{second}"
     run_alembic_command(
         engine=engine,
         command="downgrade",
