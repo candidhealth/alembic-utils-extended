@@ -5,15 +5,48 @@ import logging
 import re
 from typing import TypedDict
 
+import sqlalchemy
 from alembic.autogenerate import comparators
 from alembic.autogenerate.api import AutogenContext
 from alembic.operations import ops
 from sqlalchemy import Column, text
 from sqlalchemy.engine.reflection import Inspector
+from sqlalchemy.ext.compiler import compiles
+from sqlalchemy.schema import CreateIndex, Index
 from sqlalchemy.sql import visitors
 from sqlalchemy.sql.elements import BindParameter, TextClause
 
 logger = logging.getLogger(__name__)
+
+# ``NULLS [NOT] DISTINCT`` on a unique index (PostgreSQL 15+) is a native
+# ``postgresql_nulls_not_distinct`` dialect option from SQLAlchemy 2.0 onward.
+# SQLAlchemy 1.4 has no support at all: ``Index(...)`` rejects the kwarg and its
+# PG ``visit_create_index`` compiler never emits the clause. We run PG 17 but our
+# production SQLAlchemy is 1.4, so on 1.4 we replicate 2.0's behavior — register
+# the dialect argument so the kwarg constructs, and splice the clause into the
+# compiled ``CREATE INDEX`` ourselves. On 2.x we defer entirely to native support.
+_SA_MAJOR = int(sqlalchemy.__version__.split(".")[0])
+
+if _SA_MAJOR < 2:
+    Index.argument_for("postgresql", "nulls_not_distinct", None)
+
+    @compiles(CreateIndex, "postgresql")
+    def _compile_create_index_nulls_not_distinct(create, compiler, **kw):  # pylint: disable=unused-variable
+        # Call the compiler's bound method directly (not the ``@compiles``
+        # dispatch), so this is the original PG rendering with no recursion.
+        ddl = compiler.visit_create_index(create, **kw)
+        nnd = create.element.dialect_options["postgresql"]["nulls_not_distinct"]
+        if nnd is None or "NULLS NOT DISTINCT" in ddl or "NULLS DISTINCT" in ddl:
+            return ddl
+        clause = " NULLS NOT DISTINCT" if nnd else " NULLS DISTINCT"
+        # PG grammar places the clause after INCLUDE(...) and before
+        # WITH / TABLESPACE / WHERE. Insert ahead of the first of those, if any.
+        for marker in (" WITH (", " TABLESPACE ", " WHERE "):
+            at = ddl.find(marker)
+            if at != -1:
+                return ddl[:at] + clause + ddl[at:]
+        return ddl + clause
+
 
 # PostgreSQL's default NAMEDATALEN is 64, giving a usable identifier limit of
 # 63 characters. SQLAlchemy applies a hash-based truncation to any identifier
@@ -42,6 +75,7 @@ class _IndexKw(TypedDict, total=False):
     postgresql_ops: dict[str, str]
     postgresql_where: str
     postgresql_include: list[str]
+    postgresql_nulls_not_distinct: bool
 
 
 class _IndexInfo(TypedDict):
@@ -160,11 +194,19 @@ def compare_indexes(
                 unique=index_info.get("unique", False),
                 **index_info.get("kw", {}),
             )
+            # ``DropIndexOp.to_index()`` (used to render the downgrade's reverse
+            # CreateIndex) takes columns from ``_reverse`` but reads ``unique``
+            # and the dialect kwargs from the DropIndexOp's OWN ``kw`` — so they
+            # must be passed here, not only on ``create_op_for_reverse``, or the
+            # downgrade recreates the index without unique / using / where /
+            # include / nulls_not_distinct.
             drop_op = ops.DropIndexOp(
                 index_name=index_name,
                 table_name=table_name,
                 schema=schema_to_use,
                 _reverse=create_op_for_reverse,
+                unique=index_info.get("unique", False),
+                **index_info.get("kw", {}),
             )
             upgrade_ops.ops.append(drop_op)
 
@@ -211,6 +253,13 @@ def _get_model_indexes(metadata, schema: str | None, autogen_context: AutogenCon
                     kw["postgresql_where"] = _render_index_expression(pg_opts["where"], autogen_context)
                 if pg_opts.get("include"):
                     kw["postgresql_include"] = list(pg_opts["include"])
+                if pg_opts.get("nulls_not_distinct"):
+                    if not index.unique:
+                        raise ValueError(
+                            f"Index {index.name!r} on table {table.name!r} sets nulls_not_distinct "
+                            "but is not unique; PostgreSQL only allows NULLS NOT DISTINCT on unique indexes."
+                        )
+                    kw["postgresql_nulls_not_distinct"] = True
 
             indexes.append(
                 {
@@ -314,6 +363,11 @@ def _parse_indexdef(indexdef: str) -> tuple[list[TextClause], _IndexKw]:
     include_match = re.search(r"INCLUDE\s+\(([^)]+)\)", tail, re.IGNORECASE)
     if include_match:
         kwargs["postgresql_include"] = [c.strip() for c in include_match.group(1).split(",")]
+
+    # ``pg_get_indexdef`` emits ``NULLS NOT DISTINCT`` between INCLUDE and WHERE on
+    # PG 15+; PG < 15 never emits it, so this is safe without a server-version check.
+    if re.search(r"\bNULLS\s+NOT\s+DISTINCT\b", tail, re.IGNORECASE):
+        kwargs["postgresql_nulls_not_distinct"] = True
 
     where_match = re.search(r"WHERE\s+(.+)$", tail.strip(), re.IGNORECASE | re.DOTALL)
     if where_match:
