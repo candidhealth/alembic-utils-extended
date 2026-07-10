@@ -254,10 +254,15 @@ def _get_model_indexes(metadata, schema: str | None, autogen_context: AutogenCon
                 if pg_opts.get("include"):
                     kw["postgresql_include"] = list(pg_opts["include"])
                 if pg_opts.get("nulls_not_distinct"):
+                    # PostgreSQL accepts NULLS NOT DISTINCT on any index, but it only
+                    # affects uniqueness — on a non-unique index it is a silent no-op,
+                    # almost always a forgotten unique=True. Fail fast rather than ship
+                    # an index that doesn't do what the declaration implies.
                     if not index.unique:
                         raise ValueError(
                             f"Index {index.name!r} on table {table.name!r} sets nulls_not_distinct "
-                            "but is not unique; PostgreSQL only allows NULLS NOT DISTINCT on unique indexes."
+                            "but is not unique. NULLS NOT DISTINCT only affects uniqueness, so it has "
+                            "no effect on a non-unique index — did you mean to set unique=True?"
                         )
                     kw["postgresql_nulls_not_distinct"] = True
 

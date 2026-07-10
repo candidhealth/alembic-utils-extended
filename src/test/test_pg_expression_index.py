@@ -898,8 +898,10 @@ def test_get_model_indexes_extracts_nulls_not_distinct() -> None:
 
 
 def test_nulls_not_distinct_on_non_unique_raises() -> None:
-    """PostgreSQL only allows NULLS NOT DISTINCT on unique indexes; declaring it on
-    a non-unique index is caught at autogen time rather than failing at DDL time."""
+    """PostgreSQL accepts NULLS NOT DISTINCT on any index, but it only affects
+    uniqueness — on a non-unique index it's a silent no-op, almost always a
+    forgotten unique=True. The fork fails fast at autogen time rather than shipping
+    an index that doesn't do what the declaration implies."""
     metadata = MetaData()
     table = Table(
         "test_table",
@@ -909,7 +911,7 @@ def test_nulls_not_distinct_on_non_unique_raises() -> None:
     )
     Index("ix_test_table_name", table.c.name, postgresql_nulls_not_distinct=True)
 
-    with pytest.raises(ValueError, match=r"NULLS NOT DISTINCT"):
+    with pytest.raises(ValueError, match=r"no effect on a non-unique index"):
         _get_model_indexes(metadata, None)
 
 

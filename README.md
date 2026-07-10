@@ -109,8 +109,8 @@ SQLAlchemy 1.4 has no support for this at all (it rejects the kwarg and never em
 installs a compiler hook that splices `NULLS NOT DISTINCT` into `CREATE INDEX`. On SQLAlchemy 2.x it defers entirely to
 native support. Two caveats on 1.4: **import `alembic_utils_extended` before any model module that declares the kwarg**,
 so the dialect argument is registered first; and this covers unique *indexes* only — UNIQUE *constraints* are managed by
-stock Alembic's constraint diff and are out of scope. Setting the flag on a non-unique index raises at autogenerate time
-(PostgreSQL only permits `NULLS NOT DISTINCT` on unique indexes).
+stock Alembic's constraint diff and are out of scope. `NULLS NOT DISTINCT` only affects uniqueness, so it is a no-op on
+a non-unique index; the comparator treats the flag without `unique=True` as a mistake and raises at autogenerate time.
 
 **Content changes under a stable name are not detected.** Comparison is identity-only (`(table_name, index_name)` set
 diff). If the same index name exists in both the model and the database, the comparator treats it as unchanged. To
