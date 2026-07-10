@@ -14,6 +14,7 @@ from sqlalchemy import (
 
 from alembic_utils_extended.pg_expression_index import (
     _get_model_indexes,
+    _parse_indexdef,
     _truncate_identifier,
 )
 from alembic_utils_extended.testbase import (
@@ -861,3 +862,213 @@ def test_autogen_is_idempotent(engine, index_factory) -> None:
         command_kwargs={"revision": "base"},
         target_metadata=metadata,
     )
+
+
+# ---------------------------------------------------------------------------
+# NULLS NOT DISTINCT on unique indexes (PostgreSQL 15+). SQLAlchemy 1.4 has no
+# native support, so on 1.4 the fork registers the dialect arg and splices the
+# clause into CREATE INDEX; on 2.x it defers to native support. The unit tests
+# below run on every PG version; the integration tests skip on PG < 15.
+# ---------------------------------------------------------------------------
+
+
+def _skip_if_no_nulls_not_distinct(engine) -> None:
+    with engine.connect() as conn:
+        if (conn.dialect.server_version_info or (0,)) < (15,):
+            pytest.skip("NULLS NOT DISTINCT requires PostgreSQL 15+")
+
+
+def test_get_model_indexes_extracts_nulls_not_distinct() -> None:
+    """A unique index declared with ``postgresql_nulls_not_distinct=True`` carries
+    the flag through to the emitted op's kwargs."""
+    metadata = MetaData()
+    table = Table(
+        "test_table",
+        metadata,
+        Column("id", Integer, primary_key=True),
+        Column("name", String(100)),
+    )
+    Index("uq_test_table_name", table.c.name, unique=True, postgresql_nulls_not_distinct=True)
+
+    indexes = _get_model_indexes(metadata, None)
+
+    (idx,) = [i for i in indexes if i["name"] == "uq_test_table_name"]
+    assert idx["unique"] is True
+    assert idx["kw"].get("postgresql_nulls_not_distinct") is True
+
+
+def test_nulls_not_distinct_on_non_unique_raises() -> None:
+    """PostgreSQL accepts NULLS NOT DISTINCT on any index, but it only affects
+    uniqueness — on a non-unique index it's a silent no-op, almost always a
+    forgotten unique=True. The fork fails fast at autogen time rather than shipping
+    an index that doesn't do what the declaration implies."""
+    metadata = MetaData()
+    table = Table(
+        "test_table",
+        metadata,
+        Column("id", Integer, primary_key=True),
+        Column("name", String(100)),
+    )
+    Index("ix_test_table_name", table.c.name, postgresql_nulls_not_distinct=True)
+
+    with pytest.raises(ValueError, match=r"no effect on a non-unique index"):
+        _get_model_indexes(metadata, None)
+
+
+def test_parse_indexdef_detects_nulls_not_distinct() -> None:
+    """``_parse_indexdef`` reads NULLS NOT DISTINCT out of ``pg_get_indexdef``
+    output so a drop's reverse (downgrade) op recreates the index with the flag."""
+    with_nnd = "CREATE UNIQUE INDEX uq_t ON public.t USING btree (name) NULLS NOT DISTINCT"
+    _, kw = _parse_indexdef(with_nnd)
+    assert kw.get("postgresql_nulls_not_distinct") is True
+
+    without_nnd = "CREATE UNIQUE INDEX uq_t ON public.t USING btree (name)"
+    _, kw_plain = _parse_indexdef(without_nnd)
+    assert "postgresql_nulls_not_distinct" not in kw_plain
+
+
+def test_detect_create_unique_index_nulls_not_distinct(engine) -> None:
+    """Model declares a NULLS NOT DISTINCT unique index the DB lacks → the fork
+    emits a create op carrying the flag, and the applied index actually carries
+    NULLS NOT DISTINCT in the live catalog."""
+    _skip_if_no_nulls_not_distinct(engine)
+    metadata = MetaData()
+    table = Table(
+        "test_table",
+        metadata,
+        Column("id", Integer, primary_key=True),
+        Column("name", String(100)),
+    )
+    Index("uq_test_table_name_nnd", table.c.name, unique=True, postgresql_nulls_not_distinct=True)
+
+    with engine.begin() as connection:
+        metadata.create_all(connection)
+
+    with engine.begin() as connection:
+        connection.execute(text("DROP INDEX IF EXISTS uq_test_table_name_nnd"))
+
+    run_alembic_command(
+        engine=engine,
+        command="revision",
+        command_kwargs={"autogenerate": True, "rev_id": "1", "message": "create_nnd"},
+        target_metadata=metadata,
+        compare_indexes=True,
+    )
+
+    migration_contents = (TEST_VERSIONS_ROOT / "1_create_nnd.py").read_text()
+    assert "op.create_index" in migration_contents
+    assert "uq_test_table_name_nnd" in migration_contents
+    assert "unique=True" in migration_contents
+    assert "postgresql_nulls_not_distinct=True" in migration_contents
+
+    run_alembic_command(
+        engine=engine,
+        command="upgrade",
+        command_kwargs={"revision": "head"},
+        target_metadata=metadata,
+    )
+
+    with engine.begin() as connection:
+        indexdef = connection.execute(
+            text(
+                "SELECT pg_get_indexdef(i.indexrelid) FROM pg_index i "
+                "JOIN pg_class c ON c.oid = i.indexrelid WHERE c.relname = 'uq_test_table_name_nnd'"
+            )
+        ).scalar()
+    assert indexdef is not None and "NULLS NOT DISTINCT" in indexdef
+
+    run_alembic_command(
+        engine=engine,
+        command="downgrade",
+        command_kwargs={"revision": "base"},
+        target_metadata=metadata,
+    )
+
+
+def test_detect_drop_and_downgrade_recreates_nulls_not_distinct(engine) -> None:
+    """DB has a NULLS NOT DISTINCT unique index the model doesn't declare → drop.
+    The reverse op must recreate it with the flag intact on downgrade."""
+    _skip_if_no_nulls_not_distinct(engine)
+    metadata = MetaData()
+    Table(
+        "test_table",
+        metadata,
+        Column("id", Integer, primary_key=True),
+        Column("name", String(100)),
+    )
+
+    with engine.begin() as connection:
+        metadata.create_all(connection)
+
+    with engine.begin() as connection:
+        connection.execute(text("CREATE UNIQUE INDEX uq_test_table_name_nnd ON test_table (name) NULLS NOT DISTINCT"))
+
+    run_alembic_command(
+        engine=engine,
+        command="revision",
+        command_kwargs={"autogenerate": True, "rev_id": "1", "message": "drop_nnd"},
+        target_metadata=metadata,
+        compare_indexes=True,
+    )
+
+    migration_contents = (TEST_VERSIONS_ROOT / "1_drop_nnd.py").read_text()
+    assert "op.drop_index" in migration_contents
+    assert "uq_test_table_name_nnd" in migration_contents
+    assert "postgresql_nulls_not_distinct=True" in migration_contents
+
+    # upgrade drops it...
+    run_alembic_command(
+        engine=engine,
+        command="upgrade",
+        command_kwargs={"revision": "head"},
+        target_metadata=metadata,
+    )
+    with engine.begin() as connection:
+        exists = connection.execute(text("SELECT 1 FROM pg_class WHERE relname = 'uq_test_table_name_nnd'")).scalar()
+    assert exists is None
+
+    # ...downgrade recreates it with NULLS NOT DISTINCT.
+    run_alembic_command(
+        engine=engine,
+        command="downgrade",
+        command_kwargs={"revision": "base"},
+        target_metadata=metadata,
+    )
+    with engine.begin() as connection:
+        indexdef = connection.execute(
+            text(
+                "SELECT pg_get_indexdef(i.indexrelid) FROM pg_index i "
+                "JOIN pg_class c ON c.oid = i.indexrelid WHERE c.relname = 'uq_test_table_name_nnd'"
+            )
+        ).scalar()
+    assert indexdef is not None and "NULLS NOT DISTINCT" in indexdef
+
+
+def test_nulls_not_distinct_autogen_is_idempotent(engine) -> None:
+    """With the NULLS NOT DISTINCT unique index present in both model and DB, autogen
+    must be a no-op. Exercises the create_all render path (the fork's shim on 1.4)
+    plus the identity-only diff staying stable."""
+    _skip_if_no_nulls_not_distinct(engine)
+    metadata = MetaData()
+    table = Table(
+        "test_table",
+        metadata,
+        Column("id", Integer, primary_key=True),
+        Column("name", String(100)),
+    )
+    Index("uq_test_table_name_nnd", table.c.name, unique=True, postgresql_nulls_not_distinct=True)
+
+    with engine.begin() as connection:
+        metadata.create_all(connection)
+
+    run_alembic_command(
+        engine=engine,
+        command="revision",
+        command_kwargs={"autogenerate": True, "rev_id": "1", "message": "idem_nnd"},
+        target_metadata=metadata,
+        compare_indexes=True,
+    )
+
+    contents = (TEST_VERSIONS_ROOT / "1_idem_nnd.py").read_text()
+    assert "op.create_index" not in contents, f"Autogen re-emitted a create:\n{contents}"
+    assert "op.drop_index" not in contents, f"Autogen re-emitted a drop:\n{contents}"
