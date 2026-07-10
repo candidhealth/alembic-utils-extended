@@ -22,7 +22,7 @@ dependencies = [
     "alembic>=1.9",
     "flupy",
     "parse>=1.8.4",
-    "sqlalchemy>=1.4,<2",
+    "sqlalchemy>=1.4",
     "typing_extensions>=0.1.0",
 ]
 
