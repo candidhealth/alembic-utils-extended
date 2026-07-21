@@ -19,13 +19,27 @@ existing suite).
 """
 from alembic.autogenerate import produce_migrations
 from alembic.migration import MigrationContext
-from sqlalchemy import Column, Index, Integer, MetaData, String, Table
+from sqlalchemy import (
+    Column,
+    DateTime,
+    Index,
+    Integer,
+    MetaData,
+    String,
+    Table,
+    text,
+)
+from sqlalchemy.dialects.postgresql import UUID
 
 from alembic_utils_extended.pg_function import PGFunction
 from alembic_utils_extended.pg_trigger import PGTrigger
 from alembic_utils_extended.replaceable_entity import (
     register_entities,
     registry,
+)
+from alembic_utils_extended.testbase import (
+    TEST_VERSIONS_ROOT,
+    run_alembic_command,
 )
 
 
@@ -91,3 +105,73 @@ def test_new_table_created_before_dependent_index(engine) -> None:
     assert "CreateTableOp" in upgrade and "CreateIndexOp" in upgrade, upgrade
     assert upgrade.index("CreateTableOp") < upgrade.index("CreateIndexOp"), upgrade
     assert downgrade.index("DropIndexOp") < downgrade.index("DropTableOp"), downgrade
+
+
+# --- Immutability function/trigger builders (matching db_core.immutability). ---
+def _immutability_function(table_name: str) -> PGFunction:
+    return PGFunction(
+        schema="public",
+        signature=f"prevent_{table_name}_update()",
+        definition=f"""RETURNS TRIGGER AS $$
+BEGIN
+    RAISE EXCEPTION '{table_name} records are immutable';
+END;
+$$ LANGUAGE plpgsql;""",
+    )
+
+
+def _immutability_update_trigger(table_name: str, immutable_column: str) -> PGTrigger:
+    # ``BEFORE UPDATE OF <col>`` is validated at CREATE TRIGGER time — the column
+    # must already exist, which is exactly the ordering dependency under test.
+    return PGTrigger(
+        schema="public",
+        signature=f"trig__prevent_{table_name}_update",
+        on_entity=f"public.{table_name}",
+        is_constraint=False,
+        definition=f'BEFORE UPDATE OF "{immutable_column}" ON "{table_name}" '
+        f"FOR EACH ROW EXECUTE FUNCTION prevent_{table_name}_update();",
+    )
+
+
+def test_add_column_before_trigger_referencing_it_applies_end_to_end(engine) -> None:
+    """PR #30022 shape, end-to-end: an existing table gains a net-new column and an
+    ImmutableMixin UPDATE trigger whose ``BEFORE UPDATE OF <col>`` references that
+    new column. The generated migration must ``ADD COLUMN`` before ``CREATE
+    TRIGGER`` — otherwise ``alembic upgrade`` fails with 'column does not exist'.
+    This drives the real revision -> upgrade -> downgrade path (compare_tables
+    opts stock table autogen back in)."""
+    registry.clear()
+    with engine.begin() as connection:
+        connection.execute(text("CREATE TABLE expected_payment (id uuid PRIMARY KEY, updated_at timestamptz)"))
+
+    metadata = MetaData()
+    Table(
+        "expected_payment",
+        metadata,
+        Column("id", UUID(as_uuid=True), primary_key=True),
+        Column("updated_at", DateTime(timezone=True)),
+        Column("account_id", UUID(as_uuid=True)),  # net-new column the trigger references
+    )
+    register_entities(
+        [_immutability_function("expected_payment"), _immutability_update_trigger("expected_payment", "account_id")],
+        entity_types=[PGFunction, PGTrigger],
+    )
+
+    run_alembic_command(
+        engine=engine,
+        command="revision",
+        command_kwargs={"autogenerate": True, "rev_id": "1", "message": "immutable_expected_payment"},
+        target_metadata=metadata,
+        compare_tables=True,
+    )
+
+    migration_contents = (TEST_VERSIONS_ROOT / "1_immutable_expected_payment.py").read_text()
+    assert "op.add_column" in migration_contents
+    assert "op.create_entity" in migration_contents
+    # ADD COLUMN must be rendered before the trigger/function that depend on it.
+    assert migration_contents.index("op.add_column") < migration_contents.index("op.create_entity"), migration_contents
+
+    # The real proof: it must apply cleanly in both directions. Pre-fix this
+    # raised 'column "account_id" ... does not exist' during CREATE TRIGGER.
+    run_alembic_command(engine=engine, command="upgrade", command_kwargs={"revision": "head"}, target_metadata=metadata)
+    run_alembic_command(engine=engine, command="downgrade", command_kwargs={"revision": "base"}, target_metadata=metadata)

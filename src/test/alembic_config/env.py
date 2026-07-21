@@ -16,6 +16,10 @@ fileConfig(config.config_file_name)
 target_metadata = config.attributes.get("target_metadata", MetaData())
 compare_check_constraints = config.attributes.get("compare_check_constraints", False)
 compare_indexes = config.attributes.get("compare_indexes", False)
+# Opt-in for tests that need stock table/column autogen (e.g. op-ordering tests
+# where an entity depends on a net-new column). Off by default so the rest of the
+# suite stays isolated from stock table diffing of raw-SQL scaffolding tables.
+compare_tables = config.attributes.get("compare_tables", False)
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:
@@ -33,8 +37,11 @@ def include_object(object, name, type_, reflected, compare_to) -> bool:
         # In a 'real' implementation, this could be for example
         # ignoring entities from particular schemas.
         return not "exclude_obj_" in name
-    else:
-        return False
+    # Let stock Alembic autogen tables/columns only when a test opts in. Indexes
+    # stay off (the fork's compare_indexes owns them, per the README guidance).
+    if compare_tables and type_ in ("table", "column"):
+        return True
+    return False
 
 
 def include_name(name, type_, parent_names) -> bool:
