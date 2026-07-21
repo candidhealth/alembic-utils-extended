@@ -39,7 +39,7 @@ from __future__ import annotations
 
 from alembic.autogenerate import comparators
 from alembic.autogenerate.api import AutogenContext
-from alembic.operations import ops
+from alembic.operations import MigrateOperation, ops
 
 from alembic_utils_extended.reversible_op import CreateOp, DropOp, ReplaceOp
 
@@ -59,9 +59,9 @@ _LIBRARY_DROP_OPS = (DropOp, ops.DropIndexOp, ops.DropConstraintOp)
 
 def reorder_upgrade_ops(upgrade_ops: ops.UpgradeOps) -> None:
     """Rewrite ``upgrade_ops.ops`` to ``[library drops, stock ops, library creates]``."""
-    drops = []
-    stock = []
-    creates = []
+    drops: list[MigrateOperation] = []
+    stock: list[MigrateOperation] = []
+    creates: list[MigrateOperation] = []
     for op in upgrade_ops.ops:
         if isinstance(op, _LIBRARY_DROP_OPS):
             drops.append(op)
