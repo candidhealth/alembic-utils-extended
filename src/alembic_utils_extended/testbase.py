@@ -43,6 +43,7 @@ def run_alembic_command(
     target_metadata: MetaData | None = None,
     compare_check_constraints: bool = False,
     compare_indexes: bool = False,
+    compare_tables: bool = False,
 ) -> str:
     command_func = ALEMBIC_COMMAND_MAP[command]
 
@@ -57,6 +58,8 @@ def run_alembic_command(
             alembic_cfg.attributes["compare_check_constraints"] = compare_check_constraints
         if compare_indexes:
             alembic_cfg.attributes["compare_indexes"] = compare_indexes
+        if compare_tables:
+            alembic_cfg.attributes["compare_tables"] = compare_tables
         with contextlib.redirect_stdout(stdout):
             command_func(alembic_cfg, **command_kwargs)
     return stdout.getvalue()
