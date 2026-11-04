@@ -33,6 +33,13 @@ def read_migration(name: str) -> str:
         return migration_file.read()
 
 
+def skip_before_pg14(engine) -> None:
+    # OUT parameters on procedures and BEGIN ATOMIC bodies were added in PostgreSQL 14
+    with engine.begin() as connection:
+        if int(connection.execute(text("show server_version_num")).scalar()) < 140000:
+            pytest.skip("requires PostgreSQL 14+")
+
+
 def create_ledger_table(engine) -> None:
     with engine.begin() as connection:
         connection.execute(text("create table public.ledger (account text, amount numeric)"))
@@ -219,6 +226,7 @@ def test_drop_revision(engine, execute_all) -> None:
 
 def test_out_parameters_and_overloads(engine) -> None:
     # Overloaded procedures, including OUT parameters (PostgreSQL 14+), are tracked separately
+    skip_before_pg14(engine)
     single = PGProcedure(
         schema="public",
         signature="get_total(IN a integer, OUT total integer)",
@@ -252,6 +260,7 @@ def test_out_parameters_and_overloads(engine) -> None:
 
 def test_sql_standard_body(engine) -> None:
     # BEGIN ATOMIC bodies (PostgreSQL 14+) are parsed when reflected back from the database
+    skip_before_pg14(engine)
     create_ledger_table(engine)
     atomic = PGProcedure(
         schema="public",
@@ -303,7 +312,8 @@ def test_functions_and_procedures_do_not_mix(engine, execute_all) -> None:
         procedures = PGProcedure.from_database(connection, "public")
         functions = PGFunction.from_database(connection, "public")
 
-    assert [x.signature for x in procedures] == ["same_name(IN a integer, IN b integer)"]
+    # PostgreSQL 14+ renders procedure arguments with an explicit IN mode
+    assert [x.signature.replace("IN ", "") for x in procedures] == ["same_name(a integer, b integer)"]
     assert [x.signature for x in functions] == ["same_name(a integer)"]
 
     # Registering only the procedure must not produce a drop for the function (and vice versa)

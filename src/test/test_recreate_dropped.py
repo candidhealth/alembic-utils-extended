@@ -1,4 +1,5 @@
 import pytest
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from alembic_utils_extended.depends import recreate_dropped
@@ -67,6 +68,9 @@ def test_fails_if_user_creates_new_entity(engine, execute_all) -> None:
 def test_recreates_dependent_procedure(engine, execute_all) -> None:
     # SQL-standard procedure bodies (BEGIN ATOMIC) record a dependency on the objects they use,
     # so dropping the view with CASCADE drops the procedure too. recreate_dropped restores it.
+    with engine.begin() as connection:
+        if int(connection.execute(text("show server_version_num")).scalar()) < 140000:
+            pytest.skip("BEGIN ATOMIC requires PostgreSQL 14+")
     dependent_procedure = PGProcedure(
         schema="public",
         signature="read_root()",
