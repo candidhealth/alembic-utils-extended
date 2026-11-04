@@ -1,7 +1,9 @@
 import pytest
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from alembic_utils_extended.depends import recreate_dropped
+from alembic_utils_extended.pg_procedure import PGProcedure
 from alembic_utils_extended.pg_view import PGView
 
 TEST_ROOT_BIGINT = PGView(schema="public", signature="root", definition="select 1::bigint as some_val")
@@ -61,3 +63,27 @@ def test_fails_if_user_creates_new_entity(engine, execute_all) -> None:
         with pytest.raises(Exception):
             with recreate_dropped(connection=connection) as sess:
                 execute_all(connection, TEST_DEPENDENT.to_sql_statement_create())
+
+
+def test_recreates_dependent_procedure(engine, execute_all) -> None:
+    # SQL-standard procedure bodies (BEGIN ATOMIC) record a dependency on the objects they use,
+    # so dropping the view with CASCADE drops the procedure too. recreate_dropped restores it.
+    with engine.begin() as connection:
+        if int(connection.execute(text("show server_version_num")).scalar()) < 140000:
+            pytest.skip("BEGIN ATOMIC requires PostgreSQL 14+")
+    dependent_procedure = PGProcedure(
+        schema="public",
+        signature="read_root()",
+        definition="begin atomic select some_val from public.root; end",
+    )
+    with engine.begin() as connection:
+        execute_all(connection, TEST_ROOT_BIGINT.to_sql_statement_create())
+        execute_all(connection, dependent_procedure.to_sql_statement_create())
+
+    with recreate_dropped(connection=engine) as sess:
+        execute_all(sess, TEST_ROOT_INT.to_sql_statement_drop(cascade=True))
+        execute_all(sess, TEST_ROOT_INT.to_sql_statement_create())
+
+    with engine.begin() as connection:
+        procedures = PGProcedure.from_database(connection, "public")
+    assert [x.signature for x in procedures] == ["read_root()"]

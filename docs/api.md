@@ -26,6 +26,26 @@ to_lower = PGFunction(
 )
 ```
 
+::: alembic_utils_extended.pg_procedure.PGProcedure
+:docstring:
+
+```python
+from alembic_utils_extended.pg_procedure import PGProcedure
+
+archive_orders = PGProcedure(
+    schema="public",
+    signature="archive_orders(cutoff date)",
+    definition="""
+    language plpgsql as $$
+    begin
+        insert into orders_archive select * from orders where created_at < cutoff;
+        delete from orders where created_at < cutoff;
+    end;
+    $$
+    """
+)
+```
+
 ::: alembic_utils_extended.pg_view.PGView
 :docstring:
 
